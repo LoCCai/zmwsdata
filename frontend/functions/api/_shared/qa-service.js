@@ -654,6 +654,13 @@ function selectKnowledgeFiles(question) {
   if (question.includes('战力')) files.add('power_requirements');
   if (question.includes('资源') || question.includes('宝箱') || question.includes('商店')) files.add('resource_acquisition');
   if (question.includes('丹元')) files.add('role_danyuan_effect_index');
+  if (question.includes('青狮') || question.includes('狮王') || question.includes('青鬃狮王')) {
+    files.add('role_danyuan_effect_family_27');
+    files.add('ride_wiki_qingshi');
+  }
+  if (question.includes('白象')) {
+    files.add('role_danyuan_effect_family_28');
+  }
   if (question.includes('时装') || question.includes('续费')) files.add('role_fashion_renew');
   if (question.includes('阵法') || question.includes('红水')) files.add('role_matrix_skill');
   if (question.includes('神魔') || question.includes('神灵石') || question.includes('魔灵石')) files.add('call_god_stone_rewards');
@@ -1139,7 +1146,7 @@ async function prefetchQuestionEvidence({ env, question, search, state }) {
 
 async function expandIndexedKnowledgeFiles(request, scope, query, files) {
   const expanded = new Set(files);
-  if (normalizeScope(scope) !== 'danyuan' && !query.includes('丹元')) return [...expanded].slice(0, 6);
+  if (normalizeScope(scope) !== 'danyuan' && !query.includes('丹元') && ![...expanded].some((f) => f.includes('danyuan'))) return [...expanded].slice(0, 6);
 
   try {
     const payload = await loadJsonAsset(request, 'role_danyuan_effect_index');
@@ -1279,6 +1286,12 @@ function buildDocuments(file, payload) {
     const generic = [];
     collectGenericDocuments(data, file, '$', generic, 0);
     return buildPetWikiDocuments(file, data).concat(generic).slice(0, MAX_DOCUMENTS_PER_FILE);
+  }
+
+  if (file.startsWith('ride_wiki_') && data?.rideGroup && Array.isArray(data.variants)) {
+    const generic = [];
+    collectGenericDocuments(data, file, '$', generic, 0);
+    return buildRideWikiDocuments(file, data).concat(generic).slice(0, MAX_DOCUMENTS_PER_FILE);
   }
 
   if (file === 'power_requirements' && Array.isArray(data?.sections)) {
@@ -1457,25 +1470,42 @@ function buildDanyuanFamilyDocuments(file, family) {
     `查找位置：先查 role_danyuan_effect_index.json，再打开 ${file}.json。`,
   ]);
 
+  const DANYUAN_QUALITY_COLORS = {
+    '精良': '精良(蓝色)',
+    '史诗': '史诗(紫色)',
+    '传说': '传说(橙色)',
+    '先天': '先天(红色)',
+    '普通': '普通(白色)',
+    '优秀': '优秀(绿色)',
+  };
+
   const qualityOrder = Array.isArray(family.qualities) && family.qualities.length > 0
     ? family.qualities
     : [{ quality: 3, name: '精良' }, { quality: 4, name: '史诗' }, { quality: 5, name: '传说' }, { quality: 6, name: '先天' }];
+
+  const formatQualityName = (q) => {
+    const raw = String(q?.name || q?.quality || q || '').trim();
+    return DANYUAN_QUALITY_COLORS[raw] || raw;
+  };
+
   const levelRows = Array.isArray(family.levels)
     ? family.levels.map((level) => {
       const values = qualityOrder.map((quality) => {
+        const qName = formatQualityName(quality);
         const record = level.qualities?.[String(quality.quality)];
         const effectValues = Array.isArray(record?.effectValues) ? record.effectValues : [];
-        const resident = effectValues.find((item) => String(item.label || '').includes('常驻每层'))?.value || '未提供';
-        const burst = effectValues.find((item) => String(item.label || '').includes('无双爆发'))?.value || '未提供';
-        return `${quality.name || quality.quality} ${resident}/${burst}`;
+        if (effectValues.length === 0) return `[${qName}] 未提供`;
+        const effects = effectValues.map((item) => `${item.label || '数值'}=${item.value}`).join('，');
+        return `[${qName}] ${effects}`;
       });
       return `Lv.${level.level}：${values.join('；')}`;
     })
     : [];
   const levelsText = joinUniqueText([
     `丹元名称：${family.name}`,
-    '等级成长数值（每项格式：常驻每层空中穿透 / 无双爆发空中穿透；品质顺序按资料中的品质）：',
-    `品质顺序：${qualityOrder.map((quality) => quality.name || quality.quality).join('；')}`,
+    `属性门类：${family.innerTypeName || family.innerType}`,
+    '等级成长数值表（说明：各等级按品质分别列出各效果的精确数值。其中“先天”即为玩家常说的“红色品质”，“传说”对应“橙色品质”，“史诗”对应“紫色品质”，“精良”对应“蓝色品质”）：',
+    `包含品质：${qualityOrder.map(formatQualityName).join('、')}`,
     `等级表：\n${levelRows.join('\n')}`,
   ]);
 
@@ -1664,6 +1694,72 @@ function buildPetWikiDocuments(file, data) {
     });
   }
   return documents;
+}
+
+function buildRideWikiDocuments(file, data) {
+  const variants = Array.isArray(data?.variants) ? data.variants : [];
+  const documents = [];
+  for (const variant of variants) {
+    const rideName = variant?.ride?.name;
+    if (!rideName) continue;
+    const slots = Array.isArray(variant.slots) ? variant.slots : [];
+    const skillLines = [];
+    for (const slot of slots) {
+      const base = slot?.base;
+      const skillName = base?.name || slot?.slotLabel || '未知技能';
+      const cd = base?.header?.cd;
+      const kind = slot.slotKind === 'passive' ? '被动' : slot.slotKind === 'sp' ? '无双' : '主动';
+      const tagText = `（${kind}）`;
+      const maxLine = petSkillMaxValueLine(base);
+      skillLines.push(`- ${slot.slotLabel || slot.slot} ${skillName}${tagText}：冷却 ${cd ?? '未提供'} 秒${maxLine ? `；${maxLine}` : ''}`);
+
+      const slotDoc = buildRideSkillSlotDocument(file, rideName, slot);
+      if (slotDoc) documents.push(slotDoc);
+    }
+    if (skillLines.length === 0) continue;
+    documents.push({
+      id: `${file}:${rideName}:overview`,
+      title: `${rideName} 坐骑技能数值与冷却`,
+      source: `${file}.json / ${rideName} 技能总览`,
+      text: joinUniqueText([
+        `坐骑：${rideName}`,
+        `技能数值与冷却时间（满级参考值）：\n${skillLines.join('\n')}`,
+      ]),
+    });
+  }
+  return documents;
+}
+
+function buildRideSkillSlotDocument(file, rideName, slot) {
+  const base = slot?.base;
+  if (!base?.name) return null;
+  const levels = Array.isArray(base.levels) ? base.levels : [];
+  const compactLevels = levels.map((level) => ({
+    level: level.level,
+    roleLevel: level.roleLevel,
+    segmentVals: level.segmentVals,
+    totalPer: level.totalPer,
+    totalVal: level.totalVal,
+    growthBuffs: level.growthBuffs,
+    metrics: level.metrics,
+  }));
+  const compact = {
+    ride: rideName,
+    slot: slot.slot,
+    slotLabel: slot.slotLabel,
+    slotKind: slot.slotKind,
+    name: base.name,
+    desIntro: base.desIntro,
+    maxLevel: base.maxLevel,
+    header: base.header,
+    levels: compactLevels,
+  };
+  return {
+    id: `${file}:${rideName}:${slot.slot}:${base.name}`,
+    title: `${rideName} · ${base.name}（${slot.slotLabel || slot.slot}）`.trim(),
+    source: `${file}.json / ${rideName}/${slot.slot || base.name}`,
+    text: JSON.stringify(compactValue(compact), null, 2),
+  };
 }
 
 function powerRowUnit(label) {
