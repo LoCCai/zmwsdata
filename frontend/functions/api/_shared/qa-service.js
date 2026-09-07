@@ -135,7 +135,44 @@ const RIDE_FILES = [
   ['年兽', 'ride_wiki_nianshou'],
   ['貔貅', 'ride_wiki_pixiu'],
   ['青狮', 'ride_wiki_qingshi'],
+  ['青鬃狮王', 'ride_wiki_qingshi'],
+  ['狮王', 'ride_wiki_qingshi'],
   ['旺旺', 'ride_wiki_wangwang'],
+  ['哮天犬', 'ride_wiki_xiaotianquan'],
+];
+
+const DANYUAN_FILES = [
+  ['青蛇', 'role_danyuan_effect_family_1'],
+  ['苍狼', 'role_danyuan_effect_family_2'],
+  ['黑熊', 'role_danyuan_effect_family_3'],
+  ['白骨', 'role_danyuan_effect_family_4'],
+  ['黄袍', 'role_danyuan_effect_family_5'],
+  ['金角', 'role_danyuan_effect_family_6'],
+  ['银角', 'role_danyuan_effect_family_7'],
+  ['真火', 'role_danyuan_effect_family_8'],
+  ['牵牛', 'role_danyuan_effect_family_9'],
+  ['织女', 'role_danyuan_effect_family_10'],
+  ['羊力', 'role_danyuan_effect_family_12'],
+  ['虎力', 'role_danyuan_effect_family_13'],
+  ['鹿力', 'role_danyuan_effect_family_14'],
+  ['鱼涡', 'role_danyuan_effect_family_15'],
+  ['独角', 'role_danyuan_effect_family_16'],
+  ['真泉', 'role_danyuan_effect_family_17'],
+  ['毒蝎', 'role_danyuan_effect_family_18'],
+  ['巨牛', 'role_danyuan_effect_family_19'],
+  ['九虫', 'role_danyuan_effect_family_20'],
+  ['木仙', 'role_danyuan_effect_family_21'],
+  ['纳魔', 'role_danyuan_effect_family_22'],
+  ['蛇蜕', 'role_danyuan_effect_family_23'],
+  ['火吼', 'role_danyuan_effect_family_24'],
+  ['落蛛', 'role_danyuan_effect_family_25'],
+  ['百眼', 'role_danyuan_effect_family_26'],
+  ['青狮', 'role_danyuan_effect_family_27'],
+  ['白象', 'role_danyuan_effect_family_28'],
+  ['大鹏', 'role_danyuan_effect_family_29'],
+  ['白鹿', 'role_danyuan_effect_family_30'],
+  ['白狐', 'role_danyuan_effect_family_31'],
+  ['鼠妖', 'role_danyuan_effect_family_32'],
 ];
 
 const SEARCH_STOP_TERMS = new Set([
@@ -630,6 +667,7 @@ function selectKnowledgeFiles(question) {
   addMatches(ROLE_FILES);
   addMatches(PET_FILES);
   addMatches(RIDE_FILES);
+  addMatches(DANYUAN_FILES);
 
   if (question.includes('角色') || question.includes('技能') || question.includes('段数') || question.includes('伤害')) {
     files.add('role_wiki_skill_extra');
@@ -654,13 +692,6 @@ function selectKnowledgeFiles(question) {
   if (question.includes('战力')) files.add('power_requirements');
   if (question.includes('资源') || question.includes('宝箱') || question.includes('商店')) files.add('resource_acquisition');
   if (question.includes('丹元')) files.add('role_danyuan_effect_index');
-  if (question.includes('青狮') || question.includes('狮王') || question.includes('青鬃狮王')) {
-    files.add('role_danyuan_effect_family_27');
-    files.add('ride_wiki_qingshi');
-  }
-  if (question.includes('白象')) {
-    files.add('role_danyuan_effect_family_28');
-  }
   if (question.includes('时装') || question.includes('续费')) files.add('role_fashion_renew');
   if (question.includes('阵法') || question.includes('红水')) files.add('role_matrix_skill');
   if (question.includes('神魔') || question.includes('神灵石') || question.includes('魔灵石')) files.add('call_god_stone_rewards');
@@ -760,10 +791,10 @@ let cachedEntityNames = null;
 async function loadEntityNameVocabulary(request) {
   if (cachedEntityNames) return cachedEntityNames;
   const names = new Set();
-  for (const [keyword] of [...ROLE_FILES, ...PET_FILES, ...RIDE_FILES]) {
+  for (const [keyword] of [...ROLE_FILES, ...PET_FILES, ...RIDE_FILES, ...DANYUAN_FILES]) {
     if (keyword && keyword.length >= 2) names.add(keyword);
   }
-  for (const file of ['pet_wiki_index', 'ride_wiki_index']) {
+  for (const file of ['pet_wiki_index', 'ride_wiki_index', 'role_danyuan_effect_index']) {
     try {
       const payload = await loadJsonAsset(request, file);
       const groups = Array.isArray(payload?.data?.groups) ? payload.data.groups : [];
@@ -772,6 +803,13 @@ async function loadEntityNameVocabulary(request) {
           const name = String(entry?.petName || entry?.rideName || '').trim();
           if (name.length >= 2) names.add(name);
         }
+      }
+      const families = Array.isArray(payload?.data?.families) ? payload.data.families : [];
+      for (const family of families) {
+        const name = String(family?.name || '').trim();
+        if (name.length >= 2) names.add(name);
+        const stem = name.replace(/丹元$/, '').trim();
+        if (stem.length >= 2) names.add(stem);
       }
     } catch {
       // The index is an enhancement; never fail a search because of it.
@@ -1154,7 +1192,8 @@ async function expandIndexedKnowledgeFiles(request, scope, query, files) {
     const normalizedQuery = normalizeMatchText(query);
     const exactFamilies = families.filter((family) => {
       const name = normalizeMatchText(family.name);
-      return name && normalizedQuery.includes(name);
+      const stem = normalizeMatchText(String(family.name || '').replace(/丹元$/, ''));
+      return (name && normalizedQuery.includes(name)) || (stem && stem.length >= 2 && normalizedQuery.includes(stem));
     });
     const ranked = exactFamilies.length > 0
       ? exactFamilies.map((family) => ({ family, score: Number.POSITIVE_INFINITY }))
