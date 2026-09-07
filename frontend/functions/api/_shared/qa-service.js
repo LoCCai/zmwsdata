@@ -141,40 +141,6 @@ const RIDE_FILES = [
   ['哮天犬', 'ride_wiki_xiaotianquan'],
 ];
 
-const DANYUAN_FILES = [
-  ['青蛇', 'role_danyuan_effect_family_1'],
-  ['苍狼', 'role_danyuan_effect_family_2'],
-  ['黑熊', 'role_danyuan_effect_family_3'],
-  ['白骨', 'role_danyuan_effect_family_4'],
-  ['黄袍', 'role_danyuan_effect_family_5'],
-  ['金角', 'role_danyuan_effect_family_6'],
-  ['银角', 'role_danyuan_effect_family_7'],
-  ['真火', 'role_danyuan_effect_family_8'],
-  ['牵牛', 'role_danyuan_effect_family_9'],
-  ['织女', 'role_danyuan_effect_family_10'],
-  ['羊力', 'role_danyuan_effect_family_12'],
-  ['虎力', 'role_danyuan_effect_family_13'],
-  ['鹿力', 'role_danyuan_effect_family_14'],
-  ['鱼涡', 'role_danyuan_effect_family_15'],
-  ['独角', 'role_danyuan_effect_family_16'],
-  ['真泉', 'role_danyuan_effect_family_17'],
-  ['毒蝎', 'role_danyuan_effect_family_18'],
-  ['巨牛', 'role_danyuan_effect_family_19'],
-  ['九虫', 'role_danyuan_effect_family_20'],
-  ['木仙', 'role_danyuan_effect_family_21'],
-  ['纳魔', 'role_danyuan_effect_family_22'],
-  ['蛇蜕', 'role_danyuan_effect_family_23'],
-  ['火吼', 'role_danyuan_effect_family_24'],
-  ['落蛛', 'role_danyuan_effect_family_25'],
-  ['百眼', 'role_danyuan_effect_family_26'],
-  ['青狮', 'role_danyuan_effect_family_27'],
-  ['白象', 'role_danyuan_effect_family_28'],
-  ['大鹏', 'role_danyuan_effect_family_29'],
-  ['白鹿', 'role_danyuan_effect_family_30'],
-  ['白狐', 'role_danyuan_effect_family_31'],
-  ['鼠妖', 'role_danyuan_effect_family_32'],
-];
-
 const SEARCH_STOP_TERMS = new Set([
   '里面', '多少', '什么', '怎么', '如何', '为什么', '是否', '可以', '一下', '请问', '有没有',
   '的血', '的血量', '血量会', '量会', '会翻', '翻多', '少倍',
@@ -667,7 +633,6 @@ function selectKnowledgeFiles(question) {
   addMatches(ROLE_FILES);
   addMatches(PET_FILES);
   addMatches(RIDE_FILES);
-  addMatches(DANYUAN_FILES);
 
   if (question.includes('角色') || question.includes('技能') || question.includes('段数') || question.includes('伤害')) {
     files.add('role_wiki_skill_extra');
@@ -791,7 +756,7 @@ let cachedEntityNames = null;
 async function loadEntityNameVocabulary(request) {
   if (cachedEntityNames) return cachedEntityNames;
   const names = new Set();
-  for (const [keyword] of [...ROLE_FILES, ...PET_FILES, ...RIDE_FILES, ...DANYUAN_FILES]) {
+  for (const [keyword] of [...ROLE_FILES, ...PET_FILES, ...RIDE_FILES]) {
     if (keyword && keyword.length >= 2) names.add(keyword);
   }
   for (const file of ['pet_wiki_index', 'ride_wiki_index', 'role_danyuan_effect_index']) {
@@ -1184,32 +1149,71 @@ async function prefetchQuestionEvidence({ env, question, search, state }) {
 
 async function expandIndexedKnowledgeFiles(request, scope, query, files) {
   const expanded = new Set(files);
-  if (normalizeScope(scope) !== 'danyuan' && !query.includes('丹元') && ![...expanded].some((f) => f.includes('danyuan'))) return [...expanded].slice(0, 6);
+  const normalizedQuery = normalizeMatchText(query);
+  if (!normalizedQuery) return [...expanded].slice(0, 6);
 
+  // 1. 丹元族系索引动态解析 (role_danyuan_effect_index)
   try {
     const payload = await loadJsonAsset(request, 'role_danyuan_effect_index');
     const families = Array.isArray(payload?.data?.families) ? payload.data.families : [];
-    const normalizedQuery = normalizeMatchText(query);
     const exactFamilies = families.filter((family) => {
       const name = normalizeMatchText(family.name);
       const stem = normalizeMatchText(String(family.name || '').replace(/丹元$/, ''));
       return (name && normalizedQuery.includes(name)) || (stem && stem.length >= 2 && normalizedQuery.includes(stem));
     });
-    const ranked = exactFamilies.length > 0
-      ? exactFamilies.map((family) => ({ family, score: Number.POSITIVE_INFINITY }))
-      : families.map((family) => {
+    if (exactFamilies.length > 0) {
+      for (const family of exactFamilies) {
+        if (family.fileName) expanded.add(family.fileName);
+      }
+    } else if (query.includes('丹元') || normalizeScope(scope) === 'danyuan' || [...expanded].some((f) => f.includes('danyuan'))) {
+      const ranked = families.map((family) => {
         const text = normalizeMatchText(joinUniqueText([family.name, family.summary, family.tags]));
         const score = getSearchTerms(query)
           .reduce((total, { value, weight }) => total + (text.includes(value) ? weight : 0), 0);
         return { family, score };
       }).filter((item) => item.score > 0).sort((left, right) => right.score - left.score);
-
-    for (const { family } of ranked.slice(0, exactFamilies.length > 0 ? 1 : 2)) {
-      if (family.fileName) expanded.add(family.fileName);
+      for (const { family } of ranked.slice(0, 2)) {
+        if (family.fileName) expanded.add(family.fileName);
+      }
     }
   } catch {
     // The index itself remains searchable when detail expansion is unavailable.
   }
+
+  // 2. 坐骑索引动态解析 (ride_wiki_index)
+  try {
+    const payload = await loadJsonAsset(request, 'ride_wiki_index');
+    const groups = Array.isArray(payload?.data?.groups) ? payload.data.groups : [];
+    for (const group of groups) {
+      if (!group.fileName || group.fileName === 'ride_wiki_common') continue;
+      const groupTokens = String(group.name || '').split('/').map((s) => normalizeMatchText(s.trim())).filter((s) => s.length >= 2);
+      const entryTokens = (Array.isArray(group.entries) ? group.entries : []).map((e) => normalizeMatchText(String(e.rideName || '').trim())).filter((s) => s.length >= 2);
+      const allTokens = [...new Set([...groupTokens, ...entryTokens])];
+      if (allTokens.some((token) => normalizedQuery.includes(token))) {
+        expanded.add(group.fileName);
+      }
+    }
+  } catch {
+    // The index is an enhancement; never fail a search because of it.
+  }
+
+  // 3. 宠物索引动态解析 (pet_wiki_index)
+  try {
+    const payload = await loadJsonAsset(request, 'pet_wiki_index');
+    const groups = Array.isArray(payload?.data?.groups) ? payload.data.groups : [];
+    for (const group of groups) {
+      if (!group.fileName) continue;
+      const groupTokens = String(group.name || '').split('/').map((s) => normalizeMatchText(s.trim())).filter((s) => s.length >= 2);
+      const entryTokens = (Array.isArray(group.entries) ? group.entries : []).map((e) => normalizeMatchText(String(e.petName || '').trim())).filter((s) => s.length >= 2);
+      const allTokens = [...new Set([...groupTokens, ...entryTokens])];
+      if (allTokens.some((token) => normalizedQuery.includes(token))) {
+        expanded.add(group.fileName);
+      }
+    }
+  } catch {
+    // The index is an enhancement; never fail a search because of it.
+  }
+
   return [...expanded].slice(0, 6);
 }
 
@@ -1235,11 +1239,28 @@ async function loadJsonAsset(request, file) {
     .map((segment) => encodeURIComponent(segment))
     .join('/');
   const url = new URL(`/data/${encodedPath}.json`, request.url);
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`资料文件 ${file}.json 不可用`);
-  const length = Number(response.headers.get('Content-Length') || 0);
-  if (length > MAX_ASSET_BYTES) throw new Error(`资料文件 ${file}.json 超过限制`);
-  const text = await readBoundedText(response, MAX_ASSET_BYTES);
+  let text;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`资料文件 ${file}.json 不可用`);
+    const length = Number(response.headers?.get?.('Content-Length') || 0);
+    if (length > MAX_ASSET_BYTES) throw new Error(`资料文件 ${file}.json 超过限制`);
+    text = await readBoundedText(response, MAX_ASSET_BYTES);
+  } catch (fetchError) {
+    if (typeof process !== 'undefined' && process.versions?.node) {
+      try {
+        const fs = await import('node:fs/promises');
+        const path = await import('node:path');
+        const localPath = path.resolve(process.cwd(), 'frontend/public/data', `${file}.json`);
+        text = await fs.readFile(localPath, 'utf-8');
+      } catch {
+        throw fetchError;
+      }
+    } else {
+      throw fetchError;
+    }
+  }
+
   try {
     const parsed = JSON.parse(text);
     assetCache.set(file, parsed);
