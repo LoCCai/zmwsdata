@@ -1,6 +1,7 @@
 name = "datazmws"
 pages_build_output_dir = "frontend/dist"
 compatibility_date = "2026-08-05"
+compatibility_flags = [ "nodejs_compat" ]
 
 [vars]
 VITE_STATIC_DATA_BASE = "/data"
@@ -8,8 +9,8 @@ VITE_STATIC_DATA_BASE = "/data"
 VITE_SERVER_API_BASE = "https://api.zmwsrank.top"
 # 访问统计默认走同源 Pages Functions。临时切回旧服务器时再填写这个值。
 VITE_VISITOR_API_BASE = ""
-QA_BASE_URL = "https://x666.me/v1"
-QA_MODEL_ORDER = "gemini-3.7-flash,grok-4.5,grok-4.6"
+QA_BASE_URL = "http://220.167.100.159:13000"
+QA_MODEL_ORDER = "deepseek-v3.1,deepseek-v3.2,[opencode]deepseek-v4-flash,grok-4.6,grok-4.5,gemini-3.7-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash-api,deepseek-v4-flash"
 # 纯 Cloudflare Pages 架构，全量使用同源静态 JSON 资料检索，不依赖外部 catalog
 QA_CATALOG_BASE = ""
 

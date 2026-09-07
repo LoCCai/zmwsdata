@@ -55,9 +55,16 @@ const MECHANIC_KEYWORDS = [
 ];
 
 const DEFAULT_MODEL_ORDER = [
-  'gemini-3.7-flash',
-  'grok-4.5',
+  'deepseek-v3.1',
+  'deepseek-v3.2',
+  '[opencode]deepseek-v4-flash',
   'grok-4.6',
+  'grok-4.5',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash-api',
+  'deepseek-v4-flash',
 ];
 
 const ROLE_FILES = [
@@ -449,10 +456,11 @@ const OMIT_KEYS = new Set([
 ]);
 
 class QaError extends Error {
-  constructor(status, code, message) {
+  constructor(status, code, message, details = {}) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -567,7 +575,7 @@ export async function handleQaRequest({ request, env, waitUntil }) {
     });
   } catch (error) {
     if (error instanceof QaError) {
-      return jsonResponse({ error: error.message, code: error.code }, error.status);
+      return jsonResponse({ error: error.message, code: error.code, attempts: error.details?.attempts }, error.status);
     }
     const message = error instanceof Error ? error.message : String(error);
     return jsonResponse({ error: `问答服务失败：${message}`, code: 'EQA_INTERNAL' }, 500);
@@ -2230,6 +2238,36 @@ async function executeToolCall({ request, env, toolCall, question, state }) {
   return `工具 ${name || 'unknown'} 不可用；请先使用 search_knowledge。`;
 }
 
+const BUILTIN_PROVIDERS = [
+  {
+    name: 'channel1-ip',
+    baseUrl: 'http://220.167.100.159:13000',
+    apiKey: 'sk-hIokhf2zLKSiZD988h3B9vob9fyqJmfKY8rnp9M5VAMSUxCx',
+    models: [
+      'deepseek-v3.1',
+      'deepseek-v3.2',
+      '[opencode]deepseek-v4-flash',
+      'grok-4.6',
+      'grok-4.5',
+      'gemini-3.7-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite',
+      'gemini-3.8-flash-api',
+      'deepseek-v4-flash',
+    ],
+  },
+  {
+    name: 'channel2-hxi',
+    baseUrl: 'https://runanytime.hxi.me',
+    apiKey: 'sk-HZ4x9vtepOL2NqICMqCgckn6Bx7qD1ZqI22eOCuLkkTUfPUH',
+    models: [
+      'gemini-2.5-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-3.5-flash',
+    ],
+  },
+];
+
 function readProviderConfigs(env) {
   const defaultModels = parseModels(env?.QA_MODEL_ORDER);
   const providers = [];
@@ -2257,6 +2295,13 @@ function readProviderConfigs(env) {
       models: defaultModels,
     }, defaultModels);
     if (provider) providers.push(provider);
+  }
+
+  if (providers.length === 0) {
+    for (const item of BUILTIN_PROVIDERS) {
+      const provider = normalizeProvider(item, defaultModels);
+      if (provider) providers.push(provider);
+    }
   }
   return providers;
 }
@@ -2291,7 +2336,11 @@ function parseModels(value) {
 
 async function completeWithFallback({ providers, question, history, request, env }) {
   const attempts = [];
-  const MAX_MODEL_ATTEMPTS = 2;
+  const maxConfiguredAttempts = Number(env?.QA_MAX_ATTEMPTS);
+  const totalCandidateCount = providers.reduce((sum, p) => sum + p.models.length, 0);
+  const MAX_MODEL_ATTEMPTS = Number.isFinite(maxConfiguredAttempts) && maxConfiguredAttempts > 0
+    ? maxConfiguredAttempts
+    : Math.max(8, totalCandidateCount);
   let attemptCount = 0;
   // Comparison questions name 2+ entities. The entity-aware search already
   // returns every side's docs in one shot, so the multi-round tool harness only
@@ -2327,7 +2376,7 @@ async function completeWithFallback({ providers, question, history, request, env
       }
     }
   }
-  throw new QaError(503, 'EQA_ALL_MODELS_FAILED', `所有模型渠道均不可用：${attempts.at(-1)?.error || '未知错误'}`);
+  throw new QaError(503, 'EQA_ALL_MODELS_FAILED', `所有模型渠道均不可用：${attempts.at(-1)?.error || '未知错误'}`, { attempts });
 }
 
 async function completeWithToolHarness({ provider, model, question, history, request, env }) {
@@ -2511,15 +2560,37 @@ async function callModel({ provider, model, messages, tools = [], toolChoice, ma
   // CPU budget, so give the generation enough room to finish instead of killing
   // every non-trivial question at 40s.
   const timeout = setTimeout(() => controller.abort(), 90_000);
-  const sendRequest = (body) => fetch(`${provider.baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
+  const isDirectIp = /^https?:\/\/\d+\.\d+\.\d+\.\d+(:\d+)?/i.test(provider.baseUrl);
+  const sendRequest = async (body) => {
+    const targetUrl = `${provider.baseUrl}/v1/chat/completions`;
+    const headers = {
       'Content-Type': 'application/json',
       [provider.authHeader]: `${provider.authPrefix} ${provider.apiKey}`.trim(),
-    },
-    body: JSON.stringify(body),
-    signal: controller.signal,
-  });
+    };
+    if (isDirectIp) {
+      try {
+        return await requestViaSocket(targetUrl, {
+          method: 'POST',
+          headers,
+          body,
+          signal: controller.signal,
+        });
+      } catch (socketErr) {
+        // Fall back to standard fetch if socket transport fails
+      }
+    }
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    return {
+      ok: res.ok,
+      status: res.status,
+      text: () => readBoundedText(res, MAX_MODEL_RESPONSE_BYTES),
+    };
+  };
   try {
     const body = {
       model,
@@ -2538,20 +2609,21 @@ async function callModel({ provider, model, messages, tools = [], toolChoice, ma
     }
 
     let response = await sendRequest(body);
-    let text = await readBoundedText(response, MAX_MODEL_RESPONSE_BYTES);
+    let text = await response.text();
     if (!response.ok && disableThinking && /enable_thinking|thinking|parameter/i.test(String(text).slice(0, 500))) {
       // The proxy does not support the enable_thinking parameter; retry once
       // with the default behaviour instead of failing the whole request.
       delete body.enable_thinking;
       response = await sendRequest(body);
-      text = await readBoundedText(response, MAX_MODEL_RESPONSE_BYTES);
+      text = await response.text();
     }
 
     let payload;
     try {
       payload = JSON.parse(text);
     } catch {
-      throw new ModelRequestError('模型返回了非 JSON 响应', response.status || 502);
+      const snippet = String(text || '').slice(0, 150).replace(/\s+/g, ' ');
+      throw new ModelRequestError(`模型返回了非 JSON 响应: ${snippet || '(空)'}`, response.status || 502);
     }
     if (!response.ok) {
       throw new ModelRequestError(sanitizeErrorMessage(payload?.error?.message || payload?.error || `HTTP ${response.status}`), response.status);
@@ -2637,4 +2709,113 @@ function normalizeToolCalls(toolCalls) {
 function sanitizeErrorMessage(error) {
   const message = error instanceof Error ? error.message : String(error || '未知错误');
   return message.replace(/Bearer\s+[^\s]+/gi, 'Bearer [redacted]').slice(0, 240);
+}
+
+async function requestViaSocket(urlStr, { method = 'POST', headers = {}, body = '', signal }) {
+  const parsed = new URL(urlStr);
+  const hostname = parsed.hostname;
+  const port = Number(parsed.port) || (parsed.protocol === 'https:' ? 443 : 80);
+  const path = parsed.pathname + (parsed.search || '');
+
+  let connect;
+  try {
+    const sockets = await import('cloudflare:sockets');
+    connect = sockets.connect;
+  } catch (e) {
+    throw new Error(`cloudflare:sockets not available: ${e?.message || e}`);
+  }
+
+  const socket = connect(
+    { hostname, port },
+    { secureTransport: parsed.protocol === 'https:' ? 'on' : 'off' }
+  );
+
+  const payload = typeof body === 'string' ? body : JSON.stringify(body || {});
+  const bodyBytes = new TextEncoder().encode(payload);
+
+  const reqLines = [
+    `${method} ${path} HTTP/1.1`,
+    `Host: ${hostname}:${port}`,
+    ...Object.entries(headers)
+      .filter(([k]) => !/^(host|content-length|connection)$/i.test(k))
+      .map(([k, v]) => `${k}: ${v}`),
+    `Content-Length: ${bodyBytes.byteLength}`,
+    `Connection: close`,
+    '',
+    ''
+  ];
+  const reqHeaderBytes = new TextEncoder().encode(reqLines.join('\r\n'));
+
+  const writer = socket.writable.getWriter();
+  await writer.write(reqHeaderBytes);
+  if (bodyBytes.byteLength > 0) {
+    await writer.write(bodyBytes);
+  }
+  writer.releaseLock();
+
+  const reader = socket.readable.getReader();
+  const chunks = [];
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        throw new Error('Aborted');
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+    try { socket.close(); } catch {}
+  }
+
+  const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+  const merged = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.length;
+  }
+  const text = new TextDecoder().decode(merged);
+
+  const headerEnd = text.indexOf('\r\n\r\n');
+  if (headerEnd === -1) {
+    throw new Error('Invalid HTTP response from socket: no header separator');
+  }
+  const headerPart = text.slice(0, headerEnd);
+  let bodyPart = text.slice(headerEnd + 4);
+
+  const firstLine = headerPart.split('\r\n')[0] || '';
+  const statusMatch = firstLine.match(/HTTP\/\S+\s+(\d+)/);
+  const status = statusMatch ? parseInt(statusMatch[1], 10) : 500;
+
+  if (/transfer-encoding:\s*chunked/i.test(headerPart)) {
+    bodyPart = decodeChunked(bodyPart);
+  }
+
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => bodyPart,
+  };
+}
+
+function decodeChunked(raw) {
+  let result = '';
+  let cursor = 0;
+  while (cursor < raw.length) {
+    const nextLine = raw.indexOf('\r\n', cursor);
+    if (nextLine === -1) break;
+    const lenHex = raw.slice(cursor, nextLine).trim();
+    if (!lenHex) {
+      cursor = nextLine + 2;
+      continue;
+    }
+    const chunkSize = parseInt(lenHex, 16);
+    if (isNaN(chunkSize) || chunkSize === 0) break;
+    const chunkStart = nextLine + 2;
+    result += raw.slice(chunkStart, chunkStart + chunkSize);
+    cursor = chunkStart + chunkSize + 2;
+  }
+  return result;
 }
