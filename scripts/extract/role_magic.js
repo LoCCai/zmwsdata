@@ -362,6 +362,15 @@ const ACTIVE_GUIDES = {
     summary: '敲出雷音攻击范围敌人并造成晕眩。',
     tags: ['范围伤害', '晕眩'],
     active: ['天锤敲击空气发出雷音；第 18帧释放实际命中范围，命中敌人后造成伤害并晕眩。晕眩期间不能移动、攻击或使用技能；伤害和晕眩持续时间都随法宝等级成长。']
+  },
+  27001: {
+    summary: '召唤三道朱电追踪敌人，命中附加电蚀；目标累积受损达到阈值时触发额外伤害。',
+    tags: ['追踪攻击', '电蚀', '累损爆发'],
+    active: [
+      '召唤镜灵发射 3道朱电追踪并攻击敌人，单道造成受敌方防御影响的伤害，命中为目标附加持续 7秒的【电蚀】。',
+      '处于【电蚀】的目标在持续时间内累计受到任意伤害达到起爆门槛时，立即追加触发 1次无视防御的真实扣血伤害并清除该状态。',
+      '单道朱电基础伤害与【电蚀】追加扣血伤害均以释放者自身攻击力为基数，起爆门槛固定为该扣血伤害的 1.5倍；各项数值随法宝等级成长，详见主动技能成长表。'
+    ]
   }
 };
 
@@ -486,6 +495,11 @@ function activeGrowthTable(weaponId, skillRows, buffMap, beskillMap, monsterMap)
         if (!skill) fail(`震雷天锤缺少 Lv.${row.level} 主动伤害`);
         return { level: row.level, skill, stun: row };
       }), ACTIVE_NO_GROWTH_TEXT);
+    case 27001:
+      return table('主动技能成长表', [
+        { label: '单道朱电 / 电蚀追加扣血', value: row => formatDamage(row.damageAddPer, row.damageAddVal) || '无' },
+        { label: '电蚀起爆门槛（累计受损）', value: row => `${formatDamage(Number((row.damageAddPer * 1.5).toFixed(4)), Math.ceil(row.damageAddVal * 1.5))}（1.5倍）` }
+      ], skillRows, ACTIVE_NO_GROWTH_TEXT);
     default:
       return table('主动技能成长表', [], [], ACTIVE_NO_GROWTH_TEXT);
   }

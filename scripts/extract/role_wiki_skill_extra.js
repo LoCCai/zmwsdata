@@ -16,7 +16,9 @@ const PRESENTATION_BY_SKILL_ID = new Map([
   [21801010101, { slotLabel: "传说绝技", order: 10 }],
   [21804010101, { name: "至尊幻装·剑神无我", slotLabel: "先天绝技", order: 11 }],
   [21802010101, { slotLabel: "传说绝技", order: 20 }],
+  [21805010101, { name: "雷神幻装·万劫天雷", slotLabel: "先天绝技", order: 21 }],
   [21803010101, { slotLabel: "传说绝技", order: 30 }],
+  [21806010101, { name: "胧月幻装·胧月旖梦", slotLabel: "先天绝技", order: 31 }],
 ]);
 
 function idx(arr) {

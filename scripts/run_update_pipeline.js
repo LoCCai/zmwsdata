@@ -158,14 +158,19 @@ function runScript(scriptRelativePath, args = []) {
 }
 
 async function main() {
+  const customBaseUrl = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
+  if (customBaseUrl) {
+    console.log(`[pipeline] custom upstream base URL: ${customBaseUrl}`);
+  }
+
   console.log('[pipeline] sync map resources from upstream');
-  await runScript('scripts/sync_maps.js');
+  await runScript('scripts/sync_maps.js', customBaseUrl ? ['--overwrite', customBaseUrl] : []);
 
   console.log('[pipeline] sync battle config from upstream');
-  await runScript('scripts/sync_battle_config.js', ['--refresh-manifest']);
+  await runScript('scripts/sync_battle_config.js', customBaseUrl ? ['--refresh-manifest', '--overwrite', customBaseUrl] : ['--refresh-manifest']);
 
   console.log('[pipeline] sync dataApi from upstream');
-  await runScript('scripts/sync_data_api.js');
+  await runScript('scripts/sync_data_api.js', customBaseUrl ? [customBaseUrl] : []);
 
   console.log('[pipeline] extract resource summaries into output');
   const beforeExport = takeSnapshot(EXPORT_JSON_STAGE.watchedPaths, EXPORT_JSON_STAGE.fileExtensions);

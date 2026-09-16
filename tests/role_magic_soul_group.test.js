@@ -17,6 +17,7 @@ const expectations = [
   { name: '多智石莲', soulGroupId: 21 },
   { name: '风廉羽扇', soulGroupId: 22 },
   { name: '震雷天锤', soulGroupId: null },
+  { name: '朱电玄镜', soulGroupId: null },
 ];
 
 for (const expected of expectations) {
