@@ -368,8 +368,8 @@ const ACTIVE_GUIDES = {
     tags: ['追踪攻击', '电蚀', '累损爆发'],
     active: [
       '召唤镜灵发射 3道朱电追踪并攻击敌人，单道造成受敌方防御影响的伤害，命中为目标附加持续 7秒的【电蚀】。',
-      '处于【电蚀】的目标在持续时间内累计受到任意伤害达到起爆门槛时，立即追加触发 1次无视防御的真实扣血伤害并清除该状态。',
-      '单道朱电基础伤害与【电蚀】追加扣血伤害均以释放者自身攻击力为基数，起爆门槛固定为该扣血伤害的 1.2倍；各项数值随法宝等级成长，详见主动技能成长表。'
+      '处于【电蚀】的目标在持续时间内累计受到任意伤害达到该额外伤害的 1.2倍时，立即追加触发 1次无视防御的真实扣血额外伤害并清除该状态。',
+      '单道朱电基础伤害与【电蚀】追加伤害一致，均以释放者自身攻击力为基数并随法宝等级成长，详见主动技能成长表。'
     ]
   }
 };
@@ -495,14 +495,10 @@ function activeGrowthTable(weaponId, skillRows, buffMap, beskillMap, monsterMap)
         if (!skill) fail(`震雷天锤缺少 Lv.${row.level} 主动伤害`);
         return { level: row.level, skill, stun: row };
       }), ACTIVE_NO_GROWTH_TEXT);
-    case 27001: {
-      const buff = buffById(buffMap, 211000301);
-      const rate = Number(buff.value?.rate) || 1.2;
+    case 27001:
       return table('主动技能成长表', [
-        { label: '单道朱电 / 电蚀追加扣血', value: row => formatDamage(row.damageAddPer, row.damageAddVal) || '无' },
-        { label: '电蚀起爆门槛（累计受损）', value: row => `${formatDamage(Number((row.damageAddPer * rate).toFixed(4)), Math.ceil(row.damageAddVal * rate))}（${rate}倍）` }
+        { label: '单道朱电 / 电蚀追加伤害', value: row => formatDamage(row.damageAddPer, row.damageAddVal) || '无' }
       ], skillRows, ACTIVE_NO_GROWTH_TEXT);
-    }
     default:
       return table('主动技能成长表', [], [], ACTIVE_NO_GROWTH_TEXT);
   }
