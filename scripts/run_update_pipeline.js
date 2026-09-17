@@ -164,10 +164,10 @@ async function main() {
   }
 
   console.log('[pipeline] sync map resources from upstream');
-  await runScript('scripts/sync_maps.js', customBaseUrl ? ['--overwrite', customBaseUrl] : []);
+  await runScript('scripts/sync_maps.js', customBaseUrl ? ['--overwrite', customBaseUrl] : ['--overwrite']);
 
   console.log('[pipeline] sync battle config from upstream');
-  await runScript('scripts/sync_battle_config.js', customBaseUrl ? ['--refresh-manifest', '--overwrite', customBaseUrl] : ['--refresh-manifest']);
+  await runScript('scripts/sync_battle_config.js', customBaseUrl ? ['--refresh-manifest', '--overwrite', customBaseUrl] : ['--refresh-manifest', '--overwrite']);
 
   console.log('[pipeline] sync dataApi from upstream');
   await runScript('scripts/sync_data_api.js', customBaseUrl ? [customBaseUrl] : []);

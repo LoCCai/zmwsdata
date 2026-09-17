@@ -38,7 +38,7 @@ assert.strictEqual(payload.battlefieldTiers[0].name, '神魔战场16阶');
 assert.deepStrictEqual(
   payload.battlefieldTiers[0].limits.map((entry) => [entry.label, entry.value]),
   [
-    ['角色技能等级', 44],
+    ['角色技能', 45],
     ['坐骑技能等级', 44],
     ['丹元等级', 22],
     ['翅膀技能等级', 12],

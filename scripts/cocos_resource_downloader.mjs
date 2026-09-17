@@ -251,14 +251,17 @@ async function getManifest(options) {
 }
 
 async function buildManifest(baseUrl, timeoutMs, retry) {
+  const cacheBuster = `_t=${Date.now()}`;
   const entryUrl = new URL('index.html', baseUrl).href;
-  const entryHtml = await fetchText(entryUrl, { timeoutMs, retry });
+  const entryFetchUrl = entryUrl.includes('?') ? `${entryUrl}&${cacheBuster}` : `${entryUrl}?${cacheBuster}`;
+  const entryHtml = await fetchText(entryFetchUrl, { timeoutMs, retry });
   const settingsPath = matchRequired(entryHtml, /<script\s+src="([^"]*src\/settings\.[^"]+\.js)"/i, 'settings.js');
   const mainScriptPath = matchOptional(entryHtml, /<script\s+src="([^"]*main\.[^"]+\.js)"/i);
   const engineScriptPath = matchOptional(entryHtml, /<script\s+src="([^"]*cocos2d-js[^"\s]+)"/i);
 
   const settingsUrl = new URL(settingsPath, baseUrl).href;
-  const settingsCode = await fetchText(settingsUrl, { timeoutMs, retry });
+  const settingsFetchUrl = settingsUrl.includes('?') ? `${settingsUrl}&${cacheBuster}` : `${settingsUrl}?${cacheBuster}`;
+  const settingsCode = await fetchText(settingsFetchUrl, { timeoutMs, retry });
   const settings = evaluateSettings(settingsCode);
   const bundleNames = Object.keys(settings.bundleVers || {});
 
@@ -1022,7 +1025,14 @@ async function fetchBuffer(url, options) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeoutMs);
     try {
-      const response = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+      const response = await fetch(url, {
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+      });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} ${response.statusText}`);
       }
