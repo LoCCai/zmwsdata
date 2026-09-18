@@ -432,18 +432,53 @@ function stoneRecallConsumeSkillId(displaySkillId, ctx) {
   return null;
 }
 
-function buildXiaoyanStoneMechanics(displaySkillId, cardName, levels, ctx, warnings) {
+function buildXiaoyanMechanics(displaySkillId, cardName, levels, ctx, warnings) {
+  // 技能2：御风之灵
+  if ([7001040, 7001041, 7001046].includes(displaySkillId)) {
+    return [
+      {
+        label: "生命构成",
+        value: "风灵生命上限 = 10% × 萧嫣最大生命值 + 风灵等级生命值（随技能等级成长，见成长表）。风灵防御力与全部战斗属性 100% 实时代理萧嫣本体；属性抗性为风抗+20、雷抗-20。",
+      },
+    ];
+  }
+
+  // 技能3：溪泉之灵
+  if ([7001050, 7001051].includes(displaySkillId)) {
+    return [
+      {
+        label: "生命构成",
+        value: "水灵生命上限 = 44.44% × 萧嫣最大生命值，无技能等级固定生命成长。属性抗性为水抗+20、火抗-20。",
+      },
+    ];
+  }
+  if (displaySkillId === 7001056) {
+    return [
+      {
+        label: "生命构成",
+        value: "恶浊灵生命上限 = 88.88% × 萧嫣最大生命值，无技能等级固定生命成长。属性抗性为水抗+20、火抗-20。",
+      },
+    ];
+  }
+
+  // 技能4：山岩之灵
   const form = STONE_FORMS.get(displaySkillId);
   if (!form) return [];
   const exampleLevel = levels.find((levelRow) => levelRow.level === STONE_MECHANIC_EXAMPLE_LEVEL) || levels[0] || null;
   if (!exampleLevel) return [];
+
+  const mechanics = [
+    {
+      label: "生命构成",
+      value: "石灵生命上限 = 10% × 萧嫣最大生命值 + 石灵等级生命值（随技能等级成长，见成长表）。石灵防御力与全部战斗属性 100% 实时代理萧嫣本体；属性抗性为土抗+20、风抗-20。",
+    },
+  ];
 
   const summaries = form.formulaGroups
     .map((group) => stoneGroupSummary(exampleLevel, group, warnings, cardName))
     .filter(Boolean);
   const fixedFormula = summaries.map((summary) => `${summary.label} ${summary.fixed}`).join(" + ");
   const coefficientFormula = summaries.map((summary) => `${summary.label} ${summary.coefficient}`).join(" + ");
-  const mechanics = [];
 
   if (summaries.length === form.formulaGroups.length) {
     mechanics.push({
@@ -639,7 +674,7 @@ function buildSkillCard(displaySkillId, slot, ctx) {
       cfgFileResolved: cfg.cfgFileResolved,
       cfgResolveSource: cfg.cfgResolveSource,
       fixedBuffs,
-      mechanics: buildXiaoyanStoneMechanics(displaySkillId, skill.desName || skill.Name || `技能${displaySkillId}`, levels, ctx, warnings),
+      mechanics: buildXiaoyanMechanics(displaySkillId, skill.desName || skill.Name || `技能${displaySkillId}`, levels, ctx, warnings),
       metrics: metrics.computeMetrics(
         ctx.metricDefs, "header",
         { skillId: displaySkillId, totalPer: lv1 ? lv1.totalPer : null, releaseSeconds: rel.releaseSeconds, segCount: lv1 ? lv1.segments.reduce((a, s) => a + s.maxHit, 0) : 0 },
@@ -647,20 +682,34 @@ function buildSkillCard(displaySkillId, slot, ctx) {
       ),
     },
     maxLevel,
-    levels: levels.map((l) => ({
-      level: l.level,
-      roleLevel: l.roleLevel,
-      consumeMp: l.consumeMp,
-      segmentVals: l.segments.map((s) => ({ val: s.val, maxHit: s.maxHit })),
-      totalPer: l.totalPer,
-      totalVal: l.totalVal,
-      growthBuffs: l.growthBuffs || [],
-      metrics: metrics.computeMetrics(
+    levels: levels.map((l) => {
+      const metricList = metrics.computeMetrics(
         ctx.metricDefs, "level",
         { skillId: displaySkillId, level: l.level, roleLevel: l.roleLevel, consumeMp: l.consumeMp, totalPer: l.totalPer, totalVal: l.totalVal, growthBuffs: l.growthBuffs || [], releaseSeconds: rel.releaseSeconds, segCount: l.segments.reduce((a, s) => a + s.maxHit, 0) },
         ctx.helpers, l.level === 1 ? warnings : [],
-      ),
-    })),
+      );
+      if ([7001040, 7001041, 7001046].includes(displaySkillId)) {
+        const expRow = ctx.expById?.get(l.roleLevel) || ctx.expById?.get(1);
+        const stdHp = expRow ? expRow.hpSummonedStanderd : 0;
+        const windFlat = Math.ceil(0.9 * 0.3333 * stdHp);
+        metricList.push({ key: "summonHp", label: "风灵等级生命", value: windFlat, display: windFlat });
+      } else if ([7001060, 7001061, 7001066].includes(displaySkillId)) {
+        const expRow = ctx.expById?.get(l.roleLevel) || ctx.expById?.get(1);
+        const stdHp = expRow ? expRow.hpSummonedStanderd : 0;
+        const stoneFlat = Math.ceil(1.9 * 2.0 * stdHp);
+        metricList.push({ key: "summonHp", label: "石灵等级生命", value: stoneFlat, display: stoneFlat });
+      }
+      return {
+        level: l.level,
+        roleLevel: l.roleLevel,
+        consumeMp: l.consumeMp,
+        segmentVals: l.segments.map((s) => ({ val: s.val, maxHit: s.maxHit })),
+        totalPer: l.totalPer,
+        totalVal: l.totalVal,
+        growthBuffs: l.growthBuffs || [],
+        metrics: metricList,
+      };
+    }),
     warnings,
   };
 
@@ -831,6 +880,7 @@ function extract() {
     monsterById: idx(u.loadTable("monster")),
     buffById: idx(u.loadTable("buff")),
     beskillById: idx(u.loadTable("beskill")),
+    expById: idx(u.loadTable("exp")),
     cfg: null,
     overrides: ov.loadOverrides(ROLE_OVERRIDE),
     emitTemplate: EMIT_TEMPLATE,

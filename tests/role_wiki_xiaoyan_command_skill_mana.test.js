@@ -155,3 +155,23 @@ for (const level of CHECK_LEVELS) {
   assert.strictEqual(shieldValueAt(rideShield, level), EXPECTED_SHIELD_BY_LEVEL.get(level), `水之护盾乘御版 Lv.${level} 护盾值异常`);
   assert.ok(!commandRow.metrics.some((metric) => metric.key === 'atkConv'), `水之护盾指令版 Lv.${level} 不应展示占位攻转`);
 }
+
+// 召唤物生命构成机制与等级成长生命值断言
+assert.ok(mechanicValue(windSpirit, '生命构成').includes('10% × 萧嫣最大生命值 + 风灵等级生命值'), '风灵缺少生命构成说明');
+assert.ok(mechanicValue(waterSpirit, '生命构成').includes('44.44% × 萧嫣最大生命值'), '水灵缺少生命构成说明');
+assert.ok(mechanicValue(stoneSpirit, '生命构成').includes('10% × 萧嫣最大生命值 + 石灵等级生命值'), '石灵缺少生命构成说明');
+
+const EXPECTED_WIND_HP_BY_LEVEL = new Map([[1, 67], [15, 5277], [30, 38484], [45, 142835]]);
+const EXPECTED_STONE_HP_BY_LEVEL = new Map([[1, 840], [15, 69814], [30, 508060], [45, 1859116]]);
+
+for (const level of CHECK_LEVELS) {
+  const windRow = findLevel(windSpirit, level);
+  const windMetric = windRow.metrics.find((m) => m.key === 'summonHp');
+  assert.ok(windMetric, `风灵 Lv.${level} 缺少等级生命指标`);
+  assert.strictEqual(windMetric.value, EXPECTED_WIND_HP_BY_LEVEL.get(level), `风灵 Lv.${level} 等级生命值异常`);
+
+  const stoneRow = findLevel(stoneSpirit, level);
+  const stoneMetric = stoneRow.metrics.find((m) => m.key === 'summonHp');
+  assert.ok(stoneMetric, `石灵 Lv.${level} 缺少等级生命指标`);
+  assert.strictEqual(stoneMetric.value, EXPECTED_STONE_HP_BY_LEVEL.get(level), `石灵 Lv.${level} 等级生命值异常`);
+}
