@@ -59,6 +59,7 @@ const MODULES = [
   { key: 'ride_wiki_wangwang', file: 'ride_wiki_wangwang.js', label: '坐骑技能 Wiki → 汪汪/超级汪' },
   { key: 'ride_wiki_jinmaohou', file: 'ride_wiki_jinmaohou.js', label: '坐骑技能 Wiki → 金毛犼/冲天神犼' },
   { key: 'ride_wiki_mojingshou', file: 'ride_wiki_mojingshou.js', label: '坐骑技能 Wiki → 避火魔睛兽/至尊魔睛兽/避水金睛兽/至尊金睛兽' },
+  { key: 'ride_wiki_yinglong', file: 'ride_wiki_yinglong.js', label: '坐骑技能 Wiki → 应龙/黄龙' },
   { key: 'ride_wiki_common', file: 'ride_wiki_common.js', label: '坐骑技能 Wiki → 未专项解析坐骑' },
   { key: 'ride_skill_baseline', file: 'ride_skill_baseline.js', label: '坐骑技能 Wiki → 基准值 X' },
   { key: 'pet_wiki_hou', file: 'pet_wiki_hou.js', label: '宠物技能 Wiki → 炽焰/极光猴王' },

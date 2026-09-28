@@ -18,13 +18,25 @@ const RUNTIME_EMBEDDED_TABLES = ['breathing', 'breathingAcupoint'];
 
 async function fetchText(url, isEntry = false) {
   const finalUrl = isEntry ? (url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`) : url;
-  const res = await fetch(finalUrl, {
-    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-  });
-  if (!res.ok) {
-    throw new Error(`请求失败 ${res.status} ${res.statusText}: ${url}`);
+  let lastError;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      const res = await fetch(finalUrl, {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) {
+        throw new Error(`请求失败 ${res.status} ${res.statusText}: ${url}`);
+      }
+      return await res.text();
+    } catch (err) {
+      lastError = err;
+      if (attempt < 5) {
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
   }
-  return res.text();
+  throw lastError;
 }
 
 function resolveUrl(base, relative) {

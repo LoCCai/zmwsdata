@@ -162,7 +162,17 @@ export default function RideSkillWiki({ dataSources }: Props) {
       return {
         card: { ...slot.base, skillBaseline: baseline },
         slotLabel: slot.slotLabel,
-        badge: slot.slotKind === 'sp' ? '无双' : slot.slotKind === 'passive' ? '被动' : slot.slotKind === 'attack' ? '普攻' : undefined,
+        badge: slot.slotLabel.includes('追击')
+          ? '追击'
+          : slot.slotKind === 'sp'
+          ? '无双'
+          : slot.slotLabel.includes('骑术')
+          ? '骑术'
+          : slot.slotKind === 'passive'
+          ? '被动'
+          : slot.slotKind === 'attack'
+          ? '普攻'
+          : undefined,
       };
     });
   }, [activeVariant, baselineBySkill]);
