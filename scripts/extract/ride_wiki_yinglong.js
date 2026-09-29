@@ -82,8 +82,8 @@ const YINGLONG_MECHANICS = {
       value: "施放后在身后生成 5 颗跟随水球，持续 300 秒。"
     },
     {
-      label: "二段激活·索敌治疗",
-      value: "水球生成 1.5 秒后激活二段按键（持续 300 秒，不消耗能量）。再次按下技能键，5 颗水球锁定生命百分比最低的友方目标（包含自身）发射；友方不足 5 人时可重复选定单目标连续恢复。每颗水球命中为目标恢复【施法者 5.95% 最大生命值 + 36 点】生命值（5 颗全量命中单目标总计恢复 29.75% 施法者最大生命值 + 180 点），附加持续 20 秒的状态特效。"
+      label: "二段激活·索敌治疗与同目标衰减",
+      value: "水球生成 1.5 秒后激活二段按键（持续 300 秒，不消耗能量）。再次按下技能键，5 颗水球锁定生命百分比最低的友方目标（包含自身）发射；友方不足 5 人时可重复选定单目标连续恢复。\n治疗机制具备同目标衰减特性：\n① 首颗水球命中提供 100% 满额治疗：【施法者 5.95% 最大生命值 + 对应等级固值】；\n② 后续水球连续命中同一目标时单颗治疗量衰减至 1/6（约 16.67%）；\n③ 单目标 5 颗全中累计恢复总量为首颗的 5/3 倍（约 166.67%，即【施法者 9.92% 最大生命值 + 5/3×对应等级固值】）。"
     },
     {
       label: "普攻追击切换",
@@ -590,20 +590,23 @@ function computeRideLevel(displaySkillId, concreteIds, level, ride, slotKind, ct
     };
   }
 
-  // 技能3【澜汐凝珠】为纯召唤/智能治疗机制入口，清除0.001占位符伤害
+  // 技能3【澜汐凝珠】为纯召唤/智能治疗机制入口，注入随等级成长的回血固值
   if (displaySkillId === 20635010301 || displaySkillId === 20635030301) {
     const skill = ctx.skillById.get(displaySkillId);
     const fbSkill = ctx.skillById.get(getFallbackSkillId(displaySkillId));
     const row = ctx.skillLevelById.get(eng.skillLevelRowId(skill, level)) || (fbSkill ? ctx.skillLevelById.get(eng.skillLevelRowId(fbSkill, level)) : null);
+    const baseBuffId = displaySkillId === 20635030301 ? 1071701 : 1071401;
+    const healBuff = ctx.buffById.get(baseBuffId + level - 1);
+    const singleVal = healBuff?.value?.[0]?.[1] ?? 0;
     return {
       level,
       roleLevel: row?.roleLevel ?? null,
       consumeMp: row?.consumeMp ?? null,
       soulCost: row?.soulCost ?? null,
       kind: "effectOnly",
-      segments: [],
+      segments: [{ per: 0.0595, val: singleVal, maxHit: 1 }],
       totalPer: null,
-      totalVal: null,
+      totalVal: singleVal,
       addDefendVal: row?.addDefendVal ?? null,
     };
   }
@@ -762,13 +765,13 @@ function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {
     baseBuffId: isHuanglong ? 1071701 : 1071401,
     type: 1,
     name: "回血",
-    text: "恢复生命：单颗水球为目标恢复施法者 5.95% 最大生命值 + 36 点生命值（5 颗全量命中单目标总计恢复 29.75% 施法者最大生命值 + 180 点）",
-    displayText: "恢复生命：单颗水球为目标恢复施法者 5.95% 最大生命值 + 36 点生命值（5 颗全量命中单目标总计恢复 29.75% 施法者最大生命值 + 180 点）",
+    text: "恢复生命：单目标首球恢复施法者 5.95% 最大生命值 + 固值；后续命中同目标衰减至 1/6（约 16.67%）；5 颗全中单目标累计恢复 9.92% 最大生命值 + 5/3×固值（具体数值见下方成长区表格）。",
+    displayText: "恢复生命：单目标首球恢复施法者 5.95% 最大生命值 + 固值；后续命中同目标衰减至 1/6（约 16.67%）；5 颗全中单目标累计恢复 9.92% 最大生命值 + 5/3×固值（具体数值见下方成长区表格）。",
     time: 20,
     bindSource: "vskillHitBuff",
     bindLabel: "水球命中友方附带",
-    levelMode: "fixed",
-    value: { per: 0.0595, val: 36 },
+    levelMode: "growth",
+    value: { per: 0.0595, val: null },
   }] : [];
 
   const card = {
@@ -781,6 +784,7 @@ function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {
     desIntro,
     header: {
       kind: isS3Summon ? "effectOnly" : (reference ? reference.kind : null),
+      totalValLabel: isS3Summon ? "首球治疗固值" : null,
       segments: isS3Summon ? [] : (reference ? reference.segments.map((s) => ({ per: s.per, maxHit: s.maxHit, from: s.from })) : []),
       segCount: isS3Summon ? 0 : (reference ? reference.segments.reduce((a, s) => a + (s.maxHit || 1), 0) : 0),
       totalPer: isS3Summon ? null : (reference ? reference.totalPer : null),
@@ -796,8 +800,9 @@ function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {
       mechanics: YINGLONG_MECHANICS[displaySkillId] || [],
       note: YINGLONG_NOTES[displaySkillId] || null,
       metrics: isS3Summon ? [
-        { key: "healPerOrb", label: "单球治疗", value: 0.0595, display: "5.95% HP + 36" },
-        { key: "healTotal", label: "满额治疗", value: 0.2975, display: "29.75% HP + 180" },
+        { key: "healFirstOrbRatio", label: "首球治疗比例", value: 0.0595, display: "5.95% HP" },
+        { key: "healDecayedOrbRatio", label: "后续衰减比例", value: 0.009917, display: "0.99% HP (1/6)" },
+        { key: "healTotalRatio", label: "5球单体总比例", value: 0.099167, display: "9.92% HP (5/3)" },
       ] : metrics.computeMetrics(
         ctx.metricDefs, "header",
         { skillId: displaySkillId, totalPer: reference ? reference.totalPer : null, releaseSeconds: rel.releaseSeconds, segCount: reference ? reference.segments.reduce((a, s) => a + (s.maxHit || 1), 0) : 0 },
@@ -816,7 +821,20 @@ function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {
       totalPer: l.totalPer,
       totalVal: l.totalVal,
       growthBuffs: l.growthBuffs || [],
-      metrics: isS3Summon ? [] : metrics.computeMetrics(
+      metrics: isS3Summon ? [
+        {
+          key: "healDecayedVal",
+          label: "后续单球固值(1/6)",
+          value: Math.round((l.totalVal || 0) / 6),
+          display: Math.round((l.totalVal || 0) / 6).toLocaleString(),
+        },
+        {
+          key: "healTotalVal",
+          label: "5球全中固值(5/3)",
+          value: Math.round(((l.totalVal || 0) * 5) / 3),
+          display: Math.round(((l.totalVal || 0) * 5) / 3).toLocaleString(),
+        },
+      ] : metrics.computeMetrics(
         ctx.metricDefs, "level",
         { skillId: displaySkillId, level: l.level, roleLevel: l.roleLevel, consumeMp: l.consumeMp, totalPer: l.totalPer, totalVal: l.totalVal, growthBuffs: l.growthBuffs || [], releaseSeconds: rel.releaseSeconds, segCount: l.segments.reduce((a, s) => a + (s.maxHit || 1), 0) },
         ctx.helpers, l.level === 1 ? warnings : [],

@@ -1071,7 +1071,7 @@ function selectRoutedReadRequests(question) {
     }
   }
 
-  const levelMatches = [...question.matchAll(/(\d{1,3})级/g)].map((m) => Number(m[1])).filter((lv) => lv >= 1 && lv <= 235);
+  const levelMatches = [...question.matchAll(/(\d{1,3})级/g)].map((m) => Number(m[1])).filter((lv) => lv >= 1 && lv <= 240);
   for (const lv of levelMatches) {
     const pointers = requests.get('exp') || [];
     pointers.push(`/data/${lv - 1}`);
@@ -1436,10 +1436,10 @@ function buildExpDocuments(file, payload) {
     source: `${file}.json / overview`,
     text: joinUniqueText([
       '【角色升级经验与等级抗值标准表说明】',
-      '记录角色 1~235 级每级升级所需经验值（exp）、防御抗值标准（phyDefStandard）、通用抗值标准（commonStandard）。',
+      '记录角色 1~240 级每级升级所需经验值（exp）、防御抗值标准（phyDefStandard）、通用抗值标准（commonStandard）。',
       '核心属性定义：',
-      '- level：角色等级（1~235 级）。',
-      '- exp：升到下一级所需消耗的经验值。例如：1级升2级需150，100级需342000，214级需6463000，218级需6630000，220级需6714000，232级需7247000，235级需7387000。',
+      '- level：角色等级（1~240 级）。',
+      '- exp：升到下一级所需消耗的经验值。例如：1级升2级需150，100级需342000，214级需6463000，218级需6630000，220级需6714000，232级需7247000，235级需7387000，240级需7626000。',
       '- phyDefStandard：防御抗值标准，用于计算防御减伤因子 m = def / (def + phyDefStandard)。',
       '- commonStandard：通用抗值标准，统一作为命中、闪避、暴击、抗暴韧性、幸运、守护的标准值（S），用于副六维属性中值计算与等级压制。',
       '副六维计算法则：',
@@ -1453,7 +1453,7 @@ function buildExpDocuments(file, payload) {
     { name: '51~100级', start: 51, end: 100 },
     { name: '101~150级', start: 101, end: 150 },
     { name: '151~200级', start: 151, end: 200 },
-    { name: '201~235级', start: 201, end: 235 },
+    { name: '201~240级', start: 201, end: 240 },
   ];
 
   const tierDocs = tiers.map((tier) => {

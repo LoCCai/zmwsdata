@@ -42,7 +42,7 @@ const SUGGESTIONS = [
   '宠物技能升级到满级需要多少宠技要诀？',
   '仙织革开启背包格子的消耗规则是什么？',
   '主线 BOSS 的保护分机制是怎么计算的？',
-  '235级52000命中打琉璃宫玥伶会出闪避吗？',
+  '240级52000命中打琉璃宫玥伶会出闪避吗？',
   '增免伤修正叠加法与强攻抗性是怎么算的？',
 ];
 
@@ -443,7 +443,7 @@ export default function QaAssistant() {
             placeholder={
               isFollowUpMode
                 ? '继续追问此话题...（例如：“那满级后伤害倍率是多少？”、“升级需要消耗什么材料？”）'
-                : '例如：235级52000命中打琉璃宫玥伶会出闪避吗？或者悟空烈焰闪满级有多少段？'
+                : '例如：240级52000命中打琉璃宫玥伶会出闪避吗？或者悟空烈焰闪满级有多少段？'
             }
             className="input min-h-24 w-full resize-y leading-7 disabled:cursor-wait disabled:opacity-60 sm:min-h-28"
           />
