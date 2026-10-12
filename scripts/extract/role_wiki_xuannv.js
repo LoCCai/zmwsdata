@@ -140,7 +140,7 @@ const GUIDE_NOTES = new Map([
   [9001039, "说明:风袭为奇门衍生技，消耗1颗阴阳玉；蓝转按“本技能蓝耗 + 四技能蓝耗×1/4”修正。"],
   [9001031, "说明:巽风遁为位移+旋风；直接伤害按9段展示，不耗蓝。"],
   [9001032, "说明:玄风遁合为奇门衍生技，消耗1颗阴阳玉；按正常伤害3段展示，后续命中有大幅减伤。"],
-  [9001036, "说明:坤云遁为防守位移，云雾期间减伤99%；受到攻击时触发6段反击并致盲/暂停AI。"],
+  [9001036, "说明:坤云遁为防守位移，云雾期间减伤99%；受到攻击时位移并触发6段反击（致盲/暂停AI），反击附带超级霸体、移速强化（初始+200%，每3帧衰减1层）与闪避强化（持续2s，随等级成长）。"],
   [9001037, "说明:云影双遁为奇门衍生位移，消耗1颗阴阳玉；生成化身并给后续两次伤害技能附加减速/暴击效果。"],
   [9001040, "说明:玄空斩可取消后摇，攻转标记为净攻转；空中最多释放一次。"],
   [9001049, "说明:天岚疾斩为奇门衍生技，消耗1颗阴阳玉；蓝转按“本技能蓝耗 + 四技能蓝耗×1/4”修正。"],
@@ -542,7 +542,12 @@ function collectXuannvBuffs(displaySkillId, concreteIds, slot, ctx, warnings) {
   const growthBuffRefs = [];
   const seenBuffs = new Set();
 
-  for (const skillId of concreteIds) {
+  const scanIds = [...concreteIds];
+  if (displaySkillId === 9001036 && !scanIds.includes(9001038)) {
+    scanIds.push(9001038);
+  }
+
+  for (const skillId of scanIds) {
     const skill = ctx.skillById.get(skillId);
     if (!skill) continue;
     const cfg = resolveXuannvCfgFile(skill, slot, ROLE_ID, ctx.monsterById, warnings);
@@ -563,6 +568,7 @@ function collectXuannvBuffs(displaySkillId, concreteIds, slot, ctx, warnings) {
         name: rawBuff1.name || `buff${ref.baseBuffId}`,
         text: rawBuff1.text || null,
         time: rawBuff1.time ?? null,
+        type: rawBuff1.type ?? null,
         bindSource: ref.bindSource,
         bindLabel: BIND_SOURCE_LABEL[ref.bindSource] || ref.bindSource,
         levelMode: g1.levelMode,
@@ -641,7 +647,7 @@ function buildSkillCard(displaySkillId, slot, ctx) {
       }
       const g = eng.resolveBuffGrowth(ref.baseBuffId, lv, ctx.buffById, warnings);
       const rawBuffG = resolveRawBuff(g.buff, ctx.buffById);
-      const engBuff = { name: ref.name, bindLabel: ref.bindLabel, time: ref.time, value: buffValueSummary(rawBuffG) };
+      const engBuff = { name: ref.name, bindLabel: ref.bindLabel, time: ref.time, type: ref.type ?? rawBuffG?.type, value: buffValueSummary(rawBuffG) };
       if (ref.override && rawBuffG) {
         const { merged, warnings: w } = ov.mergeBuff(engBuff, ref.override, rawBuffG, ref.label);
         if (lv === 1) warnings.push(...w);

@@ -135,3 +135,15 @@ for (const [level, expectedAtkDown] of [[1, -3], [35, -4585], [60, -23418]]) {
   assert.strictEqual(buff?.value?.val, expectedAtkDown, `玄锋虎啸 Lv.${level} 应展示虎啸·战栗攻击降低成长值`);
   assert.ok(buff?.displayText?.includes('降低攻击'), `玄锋虎啸 Lv.${level} 应说明降低攻击效果`);
 }
+
+const kunyundun = findSkill(payload, 9001036);
+assert.ok(kunyundun.header.fixedBuffs.some((b) => b.name === '减伤' && b.displayText?.includes('减伤99%')), '坤云遁应展示云雾期间减伤99%固定效果');
+assert.ok(kunyundun.header.fixedBuffs.some((b) => b.name === '超级霸体' && b.displayText?.includes('超级霸体')), '坤云遁应展示受击反击超级霸体');
+assert.ok(kunyundun.header.fixedBuffs.some((b) => b.name === '移速强化' && b.displayText?.includes('移速+200%') && b.displayText?.includes('每3帧')), '坤云遁应展示受击反击移速强化与衰减机制');
+for (const [level, expectedDodge] of [[1, 2568], [10, 4592], [30, 46283], [60, 409592]]) {
+  const lv = kunyundun.levels.find((entry) => entry.level === level);
+  const buff = lv?.growthBuffs.find((entry) => entry.name === '闪避强化');
+  assert.strictEqual(buff?.value?.val, expectedDodge, `坤云遁 Lv.${level} 闪避值应为 ${expectedDodge}`);
+  assert.ok(buff?.displayText?.includes('增加闪避等级'), `坤云遁 Lv.${level} 应说明增加闪避等级`);
+}
+

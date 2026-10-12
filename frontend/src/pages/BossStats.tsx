@@ -29,7 +29,7 @@ export default function BossStats({ dataSources, searchQuery = '' }: Props) {
   } | undefined;
 
   const sortedGroups = useMemo(() => {
-    const order = ['主线', '精英', '噩梦', '幻境', '罗汉堂', '昆仑', '兜率宫', '十绝阵', '联盟BOSS', '七星战场', '葬灵洞', '灵宠天梯', '关卡小怪'];
+    const order = ['主线', '精英', '噩梦', '幻境', '罗汉堂', '昆仑', '兜率宫', '十绝阵', '联盟BOSS', '七星战场', '福利秘境', '葬灵洞', '灵宠天梯', '关卡小怪'];
     return [...groups].sort((a, b) => {
       const labelA = a.label || '';
       const labelB = b.label || '';
@@ -59,11 +59,31 @@ export default function BossStats({ dataSources, searchQuery = '' }: Props) {
     setCurrentPage(1);
   }, [currentTypeKey, normalizedSearchQuery]);
 
+  const searchResultBosses = useMemo(() => {
+    if (!hasSearchQuery) {
+      return routeKey === 'search' ? allBosses : [];
+    }
+    return allBosses.filter((boss) => {
+      const fields = [boss.name, boss.remark, boss.stageName];
+      return fields.some((value) => value?.toLowerCase().includes(normalizedSearchQuery));
+    });
+  }, [allBosses, hasSearchQuery, normalizedSearchQuery, routeKey]);
+
   const activeGroup = useMemo(
-    () => currentTypeKey === SEARCH_RESULTS_KEY
-      ? null
-      : sortedGroups.find((group) => (group.slug || getTypeKey(group.type)) === currentTypeKey) || null,
-    [currentTypeKey, sortedGroups]
+    () => {
+      if (currentTypeKey !== SEARCH_RESULTS_KEY) {
+        return sortedGroups.find((group) => (group.slug || getTypeKey(group.type)) === currentTypeKey) || null;
+      }
+      if (searchResultBosses.length > 0) {
+        const firstType = searchResultBosses[0].type;
+        const allSameType = searchResultBosses.every((b) => b.type === firstType);
+        if (allSameType) {
+          return sortedGroups.find((g) => g.type === firstType) || null;
+        }
+      }
+      return null;
+    },
+    [currentTypeKey, searchResultBosses, sortedGroups]
   );
 
   const supportsLevelOverride = Boolean(activeGroup?.supportsLevelOverride && currentTypeKey !== 'all');
@@ -168,16 +188,6 @@ export default function BossStats({ dataSources, searchQuery = '' }: Props) {
     }
     return '';
   }, [activeGroup, levelInput, levelOverrideMode, overrideLevel, supportsLevelOverride]);
-
-  const searchResultBosses = useMemo(() => {
-    if (!hasSearchQuery) {
-      return routeKey === 'search' ? allBosses : [];
-    }
-    return allBosses.filter((boss) => {
-      const fields = [boss.name, boss.remark, boss.stageName];
-      return fields.some((value) => value?.toLowerCase().includes(normalizedSearchQuery));
-    });
-  }, [allBosses, hasSearchQuery, normalizedSearchQuery, routeKey]);
 
   const typeScopedBosses = useMemo(() => {
     if (currentTypeKey === SEARCH_RESULTS_KEY) {

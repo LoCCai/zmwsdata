@@ -33,11 +33,10 @@ export default function FashionBall({ dataSources }: Props) {
         let totalYuanbao = 0;
 
         return ballData.map((rankGroup: any) => {
-            const levels = rankGroup.levels.map((lvl: any) => {
+            const levels = (rankGroup.levels || []).map((lvl: any) => {
                 const stepCount = lvl.upResources?.count || 0;
                 const itemId = lvl.upResources?.itemId;
                 if (itemId === 6) totalExp += stepCount;
-                if (itemId === 2) totalYuanbao += stepCount;
 
                 return {
                     ...lvl,
@@ -45,7 +44,23 @@ export default function FashionBall({ dataSources }: Props) {
                     totalYuanbao
                 };
             });
-            return { ...rankGroup, levels };
+
+            let breakthrough = null;
+            if (rankGroup.breakthrough) {
+                const btCount = rankGroup.breakthrough.upResources?.count || 0;
+                totalYuanbao += btCount;
+                breakthrough = {
+                    ...rankGroup.breakthrough,
+                    totalExp,
+                    totalYuanbao
+                };
+            }
+
+            return {
+                ...rankGroup,
+                levels,
+                breakthrough
+            };
         });
     }, [ballData]);
 
@@ -59,6 +74,9 @@ export default function FashionBall({ dataSources }: Props) {
                 <div className="flex items-center gap-3 mb-6 relative z-10">
                     <div>
                         <h2 className="text-lg font-bold text-textMain uppercase tracking-wider">时装宝珠系统</h2>
+                        <p className="text-xs text-textSub mt-1">
+                            每阶内含 1~12 级时装经验升级（单项属性依次递增）；满 12 级后进行升阶突破，消耗元宝/点券获得全属性大幅提升。
+                        </p>
                     </div>
                 </div>
 
@@ -72,62 +90,60 @@ export default function FashionBall({ dataSources }: Props) {
                                 <h3 className="text-sm font-bold text-purple-600 dark:text-purple-400">
                                     【{rankGroup.rank}阶】 时装宝珠
                                 </h3>
+                                {rankGroup.isMaxRank && (
+                                    <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-bold">
+                                        最高阶满级
+                                    </span>
+                                )}
                             </div>
 
                             <div className="p-4 flex flex-col gap-3 max-h-[600px] overflow-y-auto custom-scrollbar">
-                                {rankGroup.levels.map((lvl: any, idx: number) => {
+                                {/* 最高阶卡片 */}
+                                {rankGroup.isMaxRank && (
+                                    <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-2">
+                                        <div className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                                            20阶时装宝珠（已达满级）
+                                        </div>
+                                        <div className="text-xs text-textSub">
+                                            已激活全属性 +{Math.round(Number(rankGroup.attributeValue?.atk || 0) * 100)}% 顶级加成。
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 本阶逐级升级列表 */}
+                                {rankGroup.levels.map((lvl: any) => {
                                     const attrs = lvl.attributeValue ? Object.entries(lvl.attributeValue) : [];
-                                    const isCapstone = lvl.upLevelLimits != null || idx === rankGroup.levels.length - 1; // 阶段压轴
 
                                     return (
-                                        <div key={lvl.id} className={clsx(
-                                            "flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border transition-colors",
-                                            isCapstone
-                                                ? "bg-purple-500/5 hover:bg-purple-500/10 border-purple-500/20"
-                                                : "bg-card border-border/40 hover:border-border shadow-sm"
-                                        )}>
+                                        <div key={lvl.id || lvl.level} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border bg-card border-border/40 hover:border-border shadow-sm transition-colors">
                                             {/* Level Badge */}
                                             <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                                                <div className={clsx(
-                                                    "font-mono font-bold text-xs px-2 py-1 rounded-md",
-                                                    isCapstone ? "bg-purple-500 text-white shadow-sm shadow-purple-500/20" : "bg-surface text-textMain border border-border"
-                                                )}>
+                                                <div className="font-mono font-bold text-xs px-2 py-1 rounded-md bg-surface text-textMain border border-border">
                                                     Lv.{lvl.level}
                                                 </div>
-                                                {isCapstone && <span className="text-[9px] bg-purple-500/20 text-purple-600 dark:text-purple-300 px-1.5 py-0.5 rounded font-bold sm:hidden">本阶满级</span>}
-                                                {lvl.upLevelLimits && (
-                                                    <span className="text-[10px] font-mono text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 whitespace-nowrap">
-                                                        突破要求角色 {lvl.upLevelLimits} 级
-                                                    </span>
-                                                )}
+                                                <span className="text-[10px] text-textSub font-mono">
+                                                    {lvl.stepLabel}
+                                                </span>
                                             </div>
 
                                             {/* Attributes */}
                                             <div className="flex-1 flex flex-wrap items-center gap-2">
-                                                {attrs.length === 0 ? (
-                                                    <span className="text-textSub/50 italic text-[10px]">基础激活，无新增属性</span>
-                                                ) : attrs.length > 3 ? (
-                                                    <span className="text-[10px] text-purple-700 dark:text-purple-400 font-bold bg-purple-500/10 dark:bg-purple-500/20 px-2.5 py-1 rounded border border-purple-500/20 dark:border-purple-500/30">
-                                                        全属性 +{Math.round(Number(attrs[0][1]) * 100)}%
-                                                    </span>
-                                                ) : (
-                                                    attrs.map(([k, v]) => {
-                                                        const meta = getAttrMeta(k);
-                                                        return (
-                                                            <div key={k} className={clsx("flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-medium", meta.color)}>
-                                                                <span>{meta.label}</span>
-                                                                <span className="font-mono font-bold">+{Math.round(Number(v) * 100)}%</span>
-                                                            </div>
-                                                        )
-                                                    })
-                                                )}
+                                                {attrs.map(([k, v]) => {
+                                                    const meta = getAttrMeta(k);
+                                                    return (
+                                                        <div key={k} className={clsx("flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-medium", meta.color)}>
+                                                            <span>{meta.label}</span>
+                                                            <span className="font-mono font-bold">+{Math.round(Number(v) * 100)}%</span>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
 
                                             {/* Costs */}
                                             <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 pt-2 sm:pt-0 border-t border-border/30 sm:border-0 mt-2 sm:mt-0">
                                                 {lvl.upResources ? (
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] text-textSub block sm:hidden">升级:</span>
+                                                        <span className="text-[10px] text-textSub block sm:hidden">消耗:</span>
                                                         <CostBadge
                                                             itemId={lvl.upResources.itemId}
                                                             name={lvl.upResources.name}
@@ -138,17 +154,57 @@ export default function FashionBall({ dataSources }: Props) {
                                                     <span className="text-textSub/50 text-[10px] hidden sm:block">-</span>
                                                 )}
 
-                                                {(lvl.totalExp > 0 || lvl.totalYuanbao > 0) && (
+                                                {lvl.totalExp > 0 && (
                                                     <div className="text-[9px] flex gap-1.5 font-mono bg-black/5 dark:bg-white/5 px-2 py-1 rounded">
-                                                        {lvl.totalExp > 0 && <span className="text-emerald-800 dark:text-green-500">累计经验: {lvl.totalExp.toLocaleString()}</span>}
-                                                        {lvl.totalExp > 0 && lvl.totalYuanbao > 0 && <span className="text-border">|</span>}
-                                                        {lvl.totalYuanbao > 0 && <span className="text-amber-600 dark:text-yellow-600">累计元宝: {lvl.totalYuanbao.toLocaleString()}</span>}
+                                                        <span className="text-emerald-800 dark:text-green-500">累计经验: {lvl.totalExp.toLocaleString()}</span>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                    )
+                                    );
                                 })}
+
+                                {/* 阶末升阶突破 */}
+                                {rankGroup.breakthrough && (
+                                    <div className="p-3.5 rounded-xl border border-purple-500/40 bg-purple-500/[0.04] dark:bg-purple-500/[0.08] space-y-2.5 mt-1 shadow-sm">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
+                                                    {rankGroup.breakthrough.stepLabel}
+                                                </span>
+                                                {rankGroup.breakthrough.upLevelLimits && (
+                                                    <span className="text-[10px] font-mono text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+                                                        要求角色 {rankGroup.breakthrough.upLevelLimits} 级
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {rankGroup.breakthrough.upResources && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] text-textSub">突破消耗:</span>
+                                                    <CostBadge
+                                                        itemId={rankGroup.breakthrough.upResources.itemId}
+                                                        name={rankGroup.breakthrough.upResources.name}
+                                                        count={rankGroup.breakthrough.upResources.count}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-purple-500/20">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-textSub">突破奖励:</span>
+                                                <span className="text-[11px] text-purple-700 dark:text-purple-300 font-bold bg-purple-500/15 dark:bg-purple-500/25 px-2.5 py-1 rounded border border-purple-500/30">
+                                                    全属性 +{Math.round(Number(Object.values(rankGroup.breakthrough.attributeValue || {})[0] || 0) * 100)}%
+                                                </span>
+                                            </div>
+                                            {rankGroup.breakthrough.totalYuanbao > 0 && (
+                                                <span className="text-[9px] font-mono text-amber-600 dark:text-yellow-600 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">
+                                                    累计元宝: {rankGroup.breakthrough.totalYuanbao.toLocaleString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}

@@ -43,6 +43,10 @@ function extractMake() {
     });
   }
 
+  const consts = u.loadTable('consts');
+  const equipReplaceEntry = consts.find(c => c.key === 'equipReplace');
+  const equipReplace = equipReplaceEntry ? equipReplaceEntry.value : {};
+
   for (const r of rows) {
     const eq = equipById.get(r.id);
     const isRecastSeries = !!(r.recast && r.recast.reduction);
@@ -68,7 +72,12 @@ function extractMake() {
         cost: u.parseCost(finalCostRaw),
         recast: r.recast ?? null,
         recastUpgrade: finalUpgrade,
-        recast0To1Cost: finalUpgrade && finalUpgrade.length > 0 ? finalUpgrade[0].cost : null
+        recast0To1Cost: finalUpgrade && finalUpgrade.length > 0 ? finalUpgrade[0].cost : null,
+        transCost: (r.group != null && equipReplace[r.group] && equipReplace[r.group]['3']) ? {
+          perfect: u.parseCost(equipReplace[r.group]['3'][0]),
+          percent: u.parseCost(equipReplace[r.group]['3'][1]),
+          normal: u.parseCost(equipReplace[r.group]['3'][2])
+        } : null
       });
     }
   }
@@ -130,13 +139,71 @@ function extractStone() {
   });
 }
 
+// ━━━ 传承 ━━━ consts.*.json (equipReplace) ━━━━━━━━━
+function extractTrans() {
+  const consts = u.loadTable('consts');
+  const equipReplaceEntry = consts.find(c => c.key === 'equipReplace');
+  const equipReplace = equipReplaceEntry ? equipReplaceEntry.value : {};
+
+  const levels = Object.entries(equipReplace).map(([lvStr, typeMap]) => {
+    const level = Number(lvStr);
+    const EQUIP_SERIES_NAMES = { 20: "天煞", 30: "白霜", 40: "罗刹", 50: "幽冥", 60: "宣花", 70: "混元", 80: "紫金", 90: "火龙", 100: "九龙", 110: "三霄", 120: "仙鞘", 130: "灵鳌", 140: "金仙", 150: "究天", 160: "摩愿", 170: "罗悲", 180: "浮行", 190: "多智", 200: "风廉", 210: "萍雨", 220: "震雷", 230: "朱电", 240: "240级" };
+    const seriesName = EQUIP_SERIES_NAMES[level] || `${level}级`;
+    const costArr = typeMap['3'] || [];
+    const perfectCost = costArr[0] ? costArr[0].map(c => ({ itemId: c[0], name: u.itemName(c[0]), count: c[1] })) : [];
+    const percentCost = costArr[1] ? costArr[1].map(c => ({ itemId: c[0], name: u.itemName(c[0]), count: c[1] })) : [];
+    const normalCost = costArr[2] ? costArr[2].map(c => ({ itemId: c[0], name: u.itemName(c[0]), count: c[1] })) : [];
+
+    return {
+      level,
+      seriesName,
+      perfectCost,
+      percentCost,
+      normalCost
+    };
+  }).sort((a, b) => a.level - b.level);
+
+  const rules = [
+    {
+      title: '完美传承',
+      type: 0,
+      costItem: '天罡传承券',
+      desc: '目标神魔装备完整继承源神魔装备的附加词条类型；数值按源词条在原属性区间的百分比映射到目标装备词条区间。'
+    },
+    {
+      title: '百分比传承',
+      type: 1,
+      costItem: '天罡传承券',
+      desc: '目标神魔装备继承源神魔装备词条的百分比比例，并按目标装备的词条池重新投射。'
+    },
+    {
+      title: '普通传承',
+      type: 2,
+      costItem: '地煞传承券',
+      desc: '目标神魔装备继承源神魔装备词条，词条数值按目标区间重新随机生成。'
+    },
+    {
+      title: '材料多退少补规则',
+      desc: '传承时会计算源神魔装备累计投入的重铸石与神化/魔化材料；若源装备累计投入材料多于目标装备，差额材料原样退还；若不足，则需在传承时补齐对应差额材料。'
+    }
+  ];
+
+  u.saveOutput('role_equip_trans', { levels, rules }, {
+    system: '角色 → 装备系统 → 传承',
+    source: 'consts.*.json (equipReplace)',
+    costType: '天罡传承券(完美/百分比) + 地煞传承券(普通) + 重铸材料多退少补',
+    dedup: '按目标装备等级 30~240 级，每 10 级一档'
+  });
+}
+
 // ━━━ 主入口 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function extract() {
   console.log('\n📦 角色 → 装备系统');
   extractUpgrade();
   extractMake();
-  extractSmelt();
+  extractSmelt();
   extractStone();
+  extractTrans();
 }
 
 if (require.main === module) extract();

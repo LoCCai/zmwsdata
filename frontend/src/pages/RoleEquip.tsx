@@ -8,6 +8,31 @@ interface RoleEquipProps {
     dataSources: Record<string, any>;
 }
 
+const EQUIP_SERIES_NAMES: Record<number, string> = {
+    20: '天煞',
+    30: '白霜',
+    40: '罗刹',
+    50: '幽冥',
+    60: '宣花',
+    70: '混元',
+    80: '紫金',
+    90: '火龙',
+    100: '九龙',
+    110: '三霄',
+    120: '仙鞘',
+    130: '灵鳌',
+    140: '金仙',
+    150: '究天',
+    160: '摩愿',
+    170: '罗悲',
+    180: '浮行',
+    190: '多智',
+    200: '风廉',
+    210: '萍雨',
+    220: '震雷',
+    230: '朱电',
+};
+
 import RoleEquipUpgrade from './RoleEquipUpgrade';
 import RoleEquipSmelt from './RoleEquipSmelt';
 import RoleEquipStone from './RoleEquipStone';
@@ -127,7 +152,7 @@ export default function RoleEquip({ dataSources }: RoleEquipProps) {
                                         : "text-textSub hover:text-textMain hover:bg-slate-200/60 dark:hover:bg-white/5 border-border/50"
                                 )}
                             >
-                                {groupId === 'none' ? '神化/魔化及升重消耗' : `${groupId}级套装`}
+                                {groupId === 'none' ? '神化/魔化及升重消耗' : (EQUIP_SERIES_NAMES[Number(groupId)] ? `${EQUIP_SERIES_NAMES[Number(groupId)]} (${groupId}级)` : `${groupId}级套装`)}
                                 <span className={clsx("ml-1.5 text-[9px] px-1.5 py-0.5 rounded transition-colors font-mono font-medium", selected ? "bg-purple-500/20 text-purple-600 dark:text-purple-300" : "bg-black/10 dark:bg-white/5")}>
                                     {items.length}件
                                 </span>
@@ -142,7 +167,7 @@ export default function RoleEquip({ dataSources }: RoleEquipProps) {
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <h3 className="text-base font-bold text-textMain border-b border-border/40 pb-2.5 flex items-center justify-between">
                         <span>
-                            {activeGroup === 'none' ? '重铸需求 以戒指为例' : `${activeGroup} 级套装`}
+                            {activeGroup === 'none' ? '重铸需求 以戒指为例' : (EQUIP_SERIES_NAMES[Number(activeGroup)] ? `${EQUIP_SERIES_NAMES[Number(activeGroup)]}系列 · ${activeGroup}级套装` : `${activeGroup} 级套装`)}
                         </span>
                         <span className="text-[10px] text-textSub font-medium bg-slate-500/[0.04] dark:bg-black/20 px-2.5 py-0.5 rounded border border-border/40 font-mono">
                             共渲染 {groupedData.get(activeGroup)?.length} 个结构件
@@ -181,6 +206,27 @@ export default function RoleEquip({ dataSources }: RoleEquipProps) {
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {item.cost.map((c: any, i: number) => (
                                                         <CostBadge key={i} itemId={c.itemId} count={c.count} name={c.name} />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* transCost (传承消耗) */}
+                                        {item.transCost && (
+                                            <div className="space-y-2 bg-slate-500/[0.01] dark:bg-white/[0.01] p-3.5 rounded-xl border border-border/40 border-l-2 border-l-amber-500/50">
+                                                <div className="text-[10px] text-textSub font-bold flex items-center justify-between uppercase tracking-wide">
+                                                    <span>传承券消耗</span>
+                                                    <span className="text-[9px] text-textSub/70">完美 / 百分比 / 普通</span>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                                    {item.transCost.perfect?.map((c: any, i: number) => (
+                                                        <CostBadge key={`p-${i}`} itemId={c.itemId} count={c.count} name={`完美:${c.name}`} />
+                                                    ))}
+                                                    {item.transCost.percent?.map((c: any, i: number) => (
+                                                        <CostBadge key={`pc-${i}`} itemId={c.itemId} count={c.count} name={`百分比:${c.name}`} />
+                                                    ))}
+                                                    {item.transCost.normal?.map((c: any, i: number) => (
+                                                        <CostBadge key={`n-${i}`} itemId={c.itemId} count={c.count} name={`普通:${c.name}`} />
                                                     ))}
                                                 </div>
                                             </div>

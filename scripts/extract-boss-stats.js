@@ -64,8 +64,16 @@ const SPECIAL_STAGE_TYPE_CONFIG = {
   9: {
     noteText: '葬灵洞每关等级固定：BOSS 与随从按 bossLevel、守卫灵宠按 guardLevel 结合 monsterAttribute 模板计算',
   },
+  17: {
+    noteText: '试炼场不倒翁支持自定义等级（1~400级）查看对应属性',
+    levelOverrideMode: 'input',
+  },
   33: {
     noteText: '联盟BOSS固定等级属性不变,噩梦与挑战属性会随世界等级改变,默认以当前版本满级展示',
+    levelOverrideMode: 'input',
+  },
+  40: {
+    noteText: '福利秘境支持输入自定义等级查看对应属性',
     levelOverrideMode: 'input',
   },
   44: {
@@ -98,7 +106,7 @@ const STAGE_TYPE_RULES = {
   14: { label: 'PVP关卡', slug: 'pvp_14', exportable: false, skipReason: 'PVP 关卡，暂不导出' },
   15: { label: 'PVP关卡', slug: 'pvp_15', exportable: false, skipReason: 'PVP 关卡，暂不导出' },
   16: { label: '联盟任务', slug: 'guild_task', exportable: false, skipReason: '存在特殊效果，暂不导出' },
-  17: { label: '训练场', slug: 'training_ground', exportable: false, skipReason: '暂不导出' },
+  17: { label: '试炼场', slug: 'training_ground', exportable: true },
   18: { label: '七夕活动', slug: 'qixi_event', exportable: true },
   19: { label: '特殊关卡', slug: 'special_19', exportable: false, skipReason: '暂不导出' },
   20: { label: '特殊关卡', slug: 'special_20', exportable: false, skipReason: '暂不导出' },
@@ -2105,6 +2113,64 @@ function extractBossStats(options = {}) {
       continue;
     }
 
+    if (stageType === 17) {
+      let bossIds = [];
+      if (stage.id === 999100000) {
+        bossIds = [9000];
+      } else if (stage.id === 999100001) {
+        bossIds = [9001];
+      } else if (stage.id === 999100101) {
+        bossIds = [9001, 9000, 9014];
+      } else {
+        bossIds = [9001];
+      }
+
+      const defaultLevel = 1;
+      const stageReport = {
+        stageId: stage.id,
+        stageName: stage.name || '试炼场',
+        stageLv: defaultLevel,
+        type: stage.type,
+        subType: stage.subType,
+        mapName: stage.map,
+        source: 'training_ground',
+        bossData: [],
+        status: 'success',
+        description: stage.remark || '',
+        stageDesc: stage.remark || '',
+        levelOverride: {
+          supported: true,
+          defaultLevel,
+          minLevel: levelValues.length > 0 ? Math.min(...levelValues) : 1,
+          maxLevel: levelValues.length > 0 ? Math.max(...levelValues) : 400,
+        },
+      };
+
+      for (const bossId of bossIds) {
+        try {
+          const calcResult = calculator.calculateBoss(bossId, defaultLevel, {
+            includeFormula: true,
+          });
+          calcResult.source = 'training_ground';
+          stageReport.bossData.push(calcResult);
+        } catch (error) {
+          stageReport.bossData.push({
+            id: bossId,
+            bossId,
+            source: 'training_ground',
+            error: error.message,
+          });
+          stageReport.status = 'partial_error';
+        }
+      }
+
+      dedupeStageReportBossData(stageReport);
+      if (stageReport.bossData.length > 0) {
+        results.push(stageReport);
+      }
+      continue;
+    }
+
     const stageLevel = stageType === 44 && levelValues.length > 0
       ? maxConfiguredLevel
       : toNumber(stage.lv, 1);
@@ -2128,7 +2194,7 @@ function extractBossStats(options = {}) {
       status: 'success',
     };
 
-    if (stageType === 44) {
+    if (stageType === 44 || stageType === 40) {
       stageReport.levelOverride = {
         supported: true,
         defaultLevel: stageLevel,
@@ -2140,7 +2206,7 @@ function extractBossStats(options = {}) {
     for (const bossEntry of bossEntries) {
       try {
         const optionsForBoss = {};
-        if (stageType === 44) {
+        if (stageType === 44 || stageType === 40) {
           optionsForBoss.includeFormula = true;
         }
 
@@ -2240,6 +2306,32 @@ function extractBossStats(options = {}) {
     };
     secretSeaGroup.noteText = SPECIAL_STAGE_TYPE_CONFIG[44].noteText;
     secretSeaGroup.defaultLevel = maxConfiguredLevel;
+  }
+
+  const trainingGroup = groupedData.find((group) => toNumber(group.type) === 17);
+  if (trainingGroup) {
+    trainingGroup.supportsLevelOverride = true;
+    trainingGroup.levelOverrideMode = SPECIAL_STAGE_TYPE_CONFIG[17].levelOverrideMode;
+    trainingGroup.levelTemplates = levelTemplates;
+    trainingGroup.levelRange = {
+      min: 1,
+      max: levelValues.length > 0 ? Math.max(...levelValues) : 400,
+    };
+    trainingGroup.noteText = SPECIAL_STAGE_TYPE_CONFIG[17].noteText;
+    trainingGroup.defaultLevel = 1;
+  }
+
+  const benefitRealmGroup = groupedData.find((group) => toNumber(group.type) === 40);
+  if (benefitRealmGroup) {
+    benefitRealmGroup.supportsLevelOverride = true;
+    benefitRealmGroup.levelOverrideMode = SPECIAL_STAGE_TYPE_CONFIG[40].levelOverrideMode;
+    benefitRealmGroup.levelTemplates = levelTemplates;
+    benefitRealmGroup.levelRange = {
+      min: levelValues.length > 0 ? Math.min(...levelValues) : 1,
+      max: levelValues.length > 0 ? Math.max(...levelValues) : 1,
+    };
+    benefitRealmGroup.noteText = SPECIAL_STAGE_TYPE_CONFIG[40].noteText;
+    benefitRealmGroup.defaultLevel = 20;
   }
 
   const leagueBossGroup = groupedData.find((group) => toNumber(group.type) === 33);

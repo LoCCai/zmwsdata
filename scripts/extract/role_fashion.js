@@ -79,41 +79,75 @@ function getFashionTransSortValue(transCost) {
 // ━━━ 宝珠升级/进阶 ━━━ equipFashionBall.*.json ━━━━━━
 function extractFashionBall() {
   const raw = u.loadTable('equipFashionBall');
-  const byRank = {};
+  const byRankAndLevel = {};
   for (const r of raw) {
-    if (!byRank[r.rank]) byRank[r.rank] = { rank: r.rank, levels: [] };
-    byRank[r.rank].levels.push({
-      id: r.id,
-      level: r.level,
-      upResources: r.upResources
-        ? { itemId: r.upResources[0], name: u.itemName(r.upResources[0]), count: r.upResources[1] }
-        : null,
-      upLevelLimits: r.upLevelLimits,
-      attributeValue: r.attributeValue,
-      resourceId: r.resourceId,
-    });
+    if (!byRankAndLevel[r.rank]) byRankAndLevel[r.rank] = {};
+    byRankAndLevel[r.rank][r.level] = r;
   }
 
-  const sortedRanks = Object.values(byRank).sort((left, right) => Number(left.rank) - Number(right.rank));
-  let inheritedMaxLevelRequired = null;
-  for (const rankGroup of sortedRanks) {
-    const ownMaxLevelRequired = rankGroup.levels.reduce((current, level) => {
-      if (typeof level.upLevelLimits !== 'number' || !Number.isFinite(level.upLevelLimits)) return current;
-      return current == null ? level.upLevelLimits : Math.max(current, level.upLevelLimits);
-    }, null);
+  const maxRank = Math.max(...raw.map(r => r.rank));
+  const sortedRanks = [];
 
-    const maxLevelRequired = ownMaxLevelRequired ?? inheritedMaxLevelRequired;
-    if (maxLevelRequired != null) {
-      rankGroup.maxLevelRequired = maxLevelRequired;
-      inheritedMaxLevelRequired = maxLevelRequired;
+  for (let r = 0; r <= maxRank; r++) {
+    const rankObj = byRankAndLevel[r] || {};
+
+    if (r === maxRank) {
+      const topRow = rankObj[0] || {};
+      sortedRanks.push({
+        rank: r,
+        isMaxRank: true,
+        maxLevelRequired: null,
+        levels: [],
+        breakthrough: null,
+        attributeValue: topRow.attributeValue || null
+      });
+      continue;
     }
+
+    const levels = [];
+    for (let lvl = 1; lvl <= 12; lvl++) {
+      const currRow = rankObj[lvl] || {};
+      const prevRow = rankObj[lvl - 1] || {};
+      levels.push({
+        id: currRow.id,
+        level: lvl,
+        stepLabel: `${lvl - 1}级 → ${lvl}级`,
+        upResources: prevRow.upResources
+          ? { itemId: prevRow.upResources[0], name: u.itemName(prevRow.upResources[0]), count: prevRow.upResources[1] }
+          : null,
+        attributeValue: currRow.attributeValue || null,
+        resourceId: currRow.resourceId || prevRow.resourceId
+      });
+    }
+
+    const capRow = rankObj[12] || {};
+    const nextRankRow0 = (byRankAndLevel[r + 1] && byRankAndLevel[r + 1][0]) || {};
+
+    const breakthrough = {
+      fromRank: r,
+      toRank: r + 1,
+      stepLabel: `${r}阶 → ${r + 1}阶 升阶突破`,
+      upLevelLimits: capRow.upLevelLimits || null,
+      upResources: capRow.upResources
+        ? { itemId: capRow.upResources[0], name: u.itemName(capRow.upResources[0]), count: capRow.upResources[1] }
+        : null,
+      attributeValue: nextRankRow0.attributeValue || null
+    };
+
+    sortedRanks.push({
+      rank: r,
+      isMaxRank: false,
+      maxLevelRequired: capRow.upLevelLimits || null,
+      levels,
+      breakthrough
+    });
   }
 
   u.saveOutput('role_fashion_ball', sortedRanks, {
     system: '角色 → 时装系统 → 宝珠 → 升级/进阶',
     source: 'equipFashionBall.*.json',
-    costType: '经验道具 upResources:[itemId=6(时装经验), count]',
-    dedup: '按 rank(阶) 分组, 每阶内循环提升不同属性',
+    costType: '本阶逐级升级(时装经验) + 阶末升阶突破(点券与角色等级)',
+    dedup: '按 rank(阶) 分组；每阶含 1~12 级时装经验升级与最终升阶突破（获得全属性大幅提升）',
   });
 }
 
