@@ -377,9 +377,15 @@ function extract() {
   };
 
   const coveredIdGroups = collectCoveredIdGroups();
+  // 待完善/暂缓注册导出的坐骑组（黄龙/神瑞帝龙机制待完善，暂时注掉不导出）
+  const PENDING_ID_GROUPS = new Set([
+    20191, // 黄龙 / 神瑞帝龙
+  ]);
+
   const rides = [...ctx.rideById.values()]
     .filter(hasSkills)
     .filter((ride) => !coveredIdGroups.has(ride.idGroup ?? ride.id))
+    .filter((ride) => !PENDING_ID_GROUPS.has(ride.idGroup ?? ride.id))
     .filter((ride) => !(Array.isArray(ride.megaEvolutionId) && ride.megaEvolutionId.length > 0))
     .filter((ride) => !ride.name?.includes("(废弃)"))
     .sort((a, b) => (a.idGroup ?? a.id) - (b.idGroup ?? b.id) || a.id - b.id);
