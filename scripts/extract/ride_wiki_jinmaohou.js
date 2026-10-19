@@ -5,7 +5,7 @@
  * 导出阶段按本地攻略图鉴图4上半区收口段数,再用战斗配置补全燃烧、灼天火环和紫金铃铛区域效果。
  */
 const u = require("../lib/utils");
-const eng = require("./lib/skill-engine");
+const eng = require("./lib/ride-skill-engine");
 const ov = require("./lib/overrides");
 const metrics = require("./lib/metrics");
 
@@ -559,7 +559,7 @@ function resolveRideReleaseTime(displaySkillId, ride, displayCfg, skill, ctx, wa
         continue;
       }
       const cfg = resolveRideCfgFile(s, ride, ctx, warnings);
-      const t = cfg.entityCfg?.time?.[s.entityAction];
+      const t = eng.resolveReleaseTime(cfg.entityCfg, s.entityAction, cfg.hasActionCfg, warnings, s).releaseFrames;
       if (typeof t !== "number") {
         warnings.push({ code: eng.WARN.SOURCE_DEFAULT_30_FRAMES, detail: `composite release skill ${skillId} action=${s.entityAction} 缺少 time` });
         continue;
@@ -573,7 +573,7 @@ function resolveRideReleaseTime(displaySkillId, ride, displayCfg, skill, ctx, wa
       releaseTimeSource: frames ? `entityCtg.time:${actions.join("+")}` : "actionCfgMissing",
     };
   }
-  return eng.resolveReleaseTime(displayCfg.entityCfg, skill.entityAction, displayCfg.hasActionCfg, warnings);
+  return eng.resolveReleaseTime(displayCfg.entityCfg, skill.entityAction, displayCfg.hasActionCfg, warnings, skill);
 }
 
 function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {

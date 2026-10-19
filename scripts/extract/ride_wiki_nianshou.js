@@ -7,7 +7,7 @@
  * 图鉴口径截断，不能把 battle cfg 中的 99 段上限或全屏落星采样点当成真实段数。
  */
 const u = require("../lib/utils");
-const eng = require("./lib/skill-engine");
+const eng = require("./lib/ride-skill-engine");
 const ov = require("./lib/overrides");
 const metrics = require("./lib/metrics");
 
@@ -514,7 +514,7 @@ function resolveRideReleaseTime(displaySkillId, cfg, skill, warnings) {
       releaseTimeSource: guide.source,
     };
   }
-  return eng.resolveReleaseTime(cfg.entityCfg, skill.entityAction, cfg.hasActionCfg, warnings);
+  return eng.resolveReleaseTime(cfg.entityCfg, skill.entityAction, cfg.hasActionCfg, warnings, skill);
 }
 
 function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {

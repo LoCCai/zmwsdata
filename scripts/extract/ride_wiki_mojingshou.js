@@ -5,7 +5,7 @@
  * 导出阶段按图鉴图5收口段数,同时保留 entityCtg/bullets 中可反查的真实命中来源。
  */
 const u = require("../lib/utils");
-const eng = require("./lib/skill-engine");
+const eng = require("./lib/ride-skill-engine");
 const ov = require("./lib/overrides");
 const metrics = require("./lib/metrics");
 
@@ -559,7 +559,7 @@ function resolveRideReleaseTime(displaySkillId, cfg, skill, warnings) {
       releaseTimeSource: guide.source,
     };
   }
-  return eng.resolveReleaseTime(cfg.entityCfg, skill.entityAction, cfg.hasActionCfg, warnings);
+  return eng.resolveReleaseTime(cfg.entityCfg, skill.entityAction, cfg.hasActionCfg, warnings, skill);
 }
 
 function detectDisplayMaxLevel(displaySkillId, concreteIds, slotKind, ctx) {

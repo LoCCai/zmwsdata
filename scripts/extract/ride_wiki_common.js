@@ -7,7 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 const u = require("../lib/utils");
-const eng = require("./lib/skill-engine");
+const eng = require("./lib/ride-skill-engine");
 const metrics = require("./lib/metrics");
 
 const OUTPUT_NAME = "ride_wiki_common";
@@ -209,7 +209,7 @@ function computeRideLevel(concreteIds, level, ride, slotKind, ctx, warnings) {
     if (!firstRow) firstRow = row;
 
     const cfg = resolveRideCfgFile(skill, ride, ctx, warnings);
-    const dmg = eng.computeDamageSegments(skill, row, cfg.actionCfg, warnings);
+    const dmg = eng.computeActionDamage(skill, row, cfg.actionCfg, warnings);
     if (dmg.segments && dmg.segments.length) {
       mergedSegments.push(...dmg.segments);
       if (!mergedKind || mergedKind === "normal") mergedKind = dmg.kind;
@@ -231,29 +231,26 @@ function computeRideLevel(concreteIds, level, ride, slotKind, ctx, warnings) {
     roleLevel: firstRow.roleLevel ?? null,
     consumeMp: firstRow.consumeMp ?? null,
     soulCost: firstRow.soulCost ?? null,
-    kind: mergedKind || "normal",
+    kind: mergedSegments.length ? (mergedKind || "normal") : "effectOnly",
     segments: mergedSegments,
-    totalPer: round(totalPer),
-    totalVal: round(totalVal),
+    totalPer: mergedSegments.length ? round(totalPer) : null,
+    totalVal: mergedSegments.length ? round(totalVal) : null,
     addDefendVal: firstRow.addDefendVal ?? null,
   };
 }
 
-function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {
+function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx, branch = null) {
   const warnings = [];
   const skill = ctx.skillById.get(displaySkillId);
   if (!skill) {
     return { skillId: displaySkillId, name: `技能${displaySkillId}`, error: "skill 不存在", warnings: [{ code: eng.WARN.MISSING_SKILL }] };
   }
 
-  const concreteIds = slotKind === "passive"
+  const concreteIds = branch ? [branch.skillId] : slotKind === "passive"
     ? [displaySkillId]
     : eng.resolveConcreteSkills(displaySkillId, ctx.skillById, warnings);
   const cfg = resolveRideCfgFile(skill, ride, ctx, warnings);
-  const maxLevel = slotKind === "passive" ? 1 : eng.detectMaxLevel(skill, ctx.skillLevelById);
-  const rel = slotKind === "passive"
-    ? { releaseFrames: null, releaseSeconds: null, releaseTimeSource: "effectOnly" }
-    : eng.resolveReleaseTime(cfg.entityCfg, skill.entityAction, cfg.hasActionCfg, warnings);
+  const maxLevel = slotKind === "passive" ? 1 : eng.detectMaxLevel(ctx.skillById.get(concreteIds[0]), ctx.skillLevelById);
 
   const { fixedBuffs, growthBuffRefs } = collectBuffs(concreteIds, ride, ctx, warnings);
   const levels = [];
@@ -276,10 +273,20 @@ function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {
   }
 
   const reference = levels[levels.length - 1] || levels[0] || null;
+  let rel = reference?.kind === 'effectOnly'
+    ? { releaseFrames: null, releaseSeconds: null, releaseTimeSource: 'effectOnly' }
+    : eng.resolveReleaseTime(cfg.entityCfg, skill.entityAction, cfg.hasActionCfg, warnings, skill);
+  if (branch) {
+    const next = ctx.skillById.get(branch.skillId);
+    const nextCfg = resolveRideCfgFile(next, ride, ctx, warnings);
+    const nextTime = eng.resolveReleaseTime(nextCfg.entityCfg, next.entityAction, nextCfg.hasActionCfg, warnings, next);
+    const frames = rel.releaseFrames + nextTime.releaseFrames;
+    rel = { releaseFrames: frames, releaseSeconds: frames / 30, releaseTimeSource: `sequence:${skill.entityAction}+${next.entityAction}` };
+  }
   const referenceSegCount = reference ? reference.segments.reduce((a, s) => a + (s.maxHit || 1), 0) : 0;
   return {
     skillId: displaySkillId,
-    name: skill.desName || skill.Name || `技能${displaySkillId}`,
+    name: (skill.desName || skill.Name || `技能${displaySkillId}`) + (branch ? `（${branch.chance}%分支）` : ''),
     icon: skill.icon || null,
     attribute: skill.attribute ?? null,
     entityAction: skill.entityAction || null,
@@ -298,6 +305,8 @@ function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {
       cfgFileResolved: cfg.cfgFileResolved,
       cfgResolveSource: cfg.cfgResolveSource,
       referenceLevel: reference?.level ?? null,
+      ...(displaySkillId === 20603010101 ? { note: '全中上限：前方三处冥火各造成 470% 攻击伤害，累计 1410%；实战命中取决于站位和目标体积。低等级固伤修正较高来自官方等级表的成长曲线，详情按所选等级计算。' } : {}),
+      ...(branch ? { note: `随机分支分别展示，触发权重 ${branch.chance}%；伤害不与另一分支叠加，耗时包含起手和分支动作。` } : {}),
       fixedBuffs,
       metrics: metrics.computeMetrics(
         ctx.metricDefs,
@@ -337,6 +346,20 @@ function buildSlots(ride, ctx) {
     const ids = asArray(ride[def.key]).filter(Boolean);
     ids.forEach((skillId, index) => {
       const slotLabel = def.kind === "sp" || def.kind === "passive" ? def.labelPrefix : `${def.labelPrefix}${index + 1}`;
+      // 胖呆势如破竹：type58 随机选择两个 type5 后续动作，不能把入口占位值当伤害。
+      if (skillId === 20608010101) {
+        const skill = ctx.skillById.get(skillId);
+        const cfg = resolveRideCfgFile(skill, ride, ctx, []);
+        const choice = cfg.actionCfg.com.find(c => c.type === 58 && !c.notActive);
+        const weightSum = choice.weight.reduce((sum, n) => sum + n, 0);
+        choice.comIds.forEach((sign, branchIndex) => {
+          const link = cfg.actionCfg.com.find(c => c.type === 5 && c.sign === sign);
+          const branch = { skillId: link.skillLink[0], chance: round(choice.weight[branchIndex] / weightSum * 100) };
+          slots.push({ slot: `${def.key}${index + 1}_branch${branchIndex + 1}`, slotLabel, slotKind: def.kind,
+            base: buildSkillCard(skillId, ride, slotLabel, def.kind, ctx, branch), awakens: [], allAwakenIdentical: false });
+        });
+        return;
+      }
       slots.push({
         slot: `${def.key}${index + 1}`,
         slotLabel,
@@ -377,16 +400,10 @@ function extract() {
   };
 
   const coveredIdGroups = collectCoveredIdGroups();
-  // 待完善/暂缓注册导出的坐骑组（黄龙/神瑞帝龙机制待完善，暂时注掉不导出）
-  const PENDING_ID_GROUPS = new Set([
-    20191, // 黄龙 / 神瑞帝龙
-  ]);
 
   const rides = [...ctx.rideById.values()]
     .filter(hasSkills)
     .filter((ride) => !coveredIdGroups.has(ride.idGroup ?? ride.id))
-    .filter((ride) => !PENDING_ID_GROUPS.has(ride.idGroup ?? ride.id))
-    .filter((ride) => !(Array.isArray(ride.megaEvolutionId) && ride.megaEvolutionId.length > 0))
     .filter((ride) => !ride.name?.includes("(废弃)"))
     .sort((a, b) => (a.idGroup ?? a.id) - (b.idGroup ?? b.id) || a.id - b.id);
 

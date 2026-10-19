@@ -133,6 +133,7 @@ function collectSamples(warnings) {
         const header = base?.header;
         if (!base || !header) continue;
         if (!ACTIVE_SLOT_KINDS.has(base.slotKind || slot.slotKind)) continue;
+        if (header.kind === 'effectOnly') continue;
 
         const cd = header.cd;
         if (typeof cd !== "number" || !Number.isFinite(cd) || cd <= 0) {
@@ -144,6 +145,7 @@ function collectSamples(warnings) {
           if (typeof totalVal !== "number" || !Number.isFinite(totalVal) || totalVal <= 1) {
             continue;
           }
+          if (levelRow.segmentVals?.length && !levelRow.segmentVals.some((segment) => segment.val > 1)) continue;
 
           samples.push({
             file,
@@ -159,6 +161,7 @@ function collectSamples(warnings) {
             cd,
             totalVal,
             totalValPerCd: totalVal / cd,
+            baselineEligible: ride.close !== 1 && ride.cancel !== 1,
           });
         }
       }
@@ -213,7 +216,13 @@ function buildClusters(samples) {
 
 function inferBaselines(samples, warnings) {
   const byLevel = new Map();
+  const seen = new Set();
   for (const sample of samples) {
+    // 同一技能的多个进化形态不能重复投票；关闭配置仅计算比值，不参与反推 X。
+    if (!sample.baselineEligible) continue;
+    const key = `${sample.level}|${sample.skillId}|${sample.totalVal}|${sample.cd}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     if (!byLevel.has(sample.level)) byLevel.set(sample.level, []);
     byLevel.get(sample.level).push(sample);
   }
@@ -364,7 +373,7 @@ function extract() {
   }, {
     system: "坐骑 → 技能数值基准值",
     source: "output/ride_wiki_*.json",
-    method: "按技能等级聚类 totalVal / cd,最大主簇作为该等级坐骑 X;再计算 totalVal / X 和 (totalVal / X) / cd",
+    method: "按技能等级聚类 totalVal / cd，相同技能数值去重且排除关闭配置后，以最大主簇作为该等级坐骑 X；再计算 totalVal / X 和 (totalVal / X) / cd",
     clusterRelativeTolerance: BASELINE_CLUSTER_RELATIVE_TOLERANCE,
     fixedMultiplierStaticRelativeRangeLimit: FIXED_MULTIPLIER_STATIC_RELATIVE_RANGE_LIMIT,
     note: "不读取攻略倍率文本;缺 CD、缺固伤或仅有 0/1 占位伤害不补值;无有效 CD 的技能不进入样本",

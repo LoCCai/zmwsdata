@@ -6,7 +6,7 @@
  * 避免把入口技能的 0/1 占位值或弹幕采样点当成技能数值。
  */
 const u = require("../lib/utils");
-const eng = require("./lib/skill-engine");
+const eng = require("./lib/ride-skill-engine");
 const ov = require("./lib/overrides");
 const metrics = require("./lib/metrics");
 
@@ -92,16 +92,9 @@ const GUIDE_SEGMENT_RULES = new Map([
   [FENGHUANG_SKILL.ICE_FREEZE, { source: "actionBullet:3763", hits: 7, detail: "寒冰冻结攻略图鉴按7连击展示" }],
 ]);
 
-function guideRelease(seconds, source) {
-  return { frames: Math.round(seconds * BATTLE_FRAMES_PER_SECOND), source };
-}
-
-const GUIDE_RELEASE_FRAMES = new Map([
-  [FENGHUANG_SKILL.FIRE_CONE, guideRelease(1.27, "guide:rideSummary:image9:火锥冲击释放1.27s")],
-  [FENGHUANG_SKILL.ICE_CONE, guideRelease(1.27, "guide:rideSummary:image9:冰锥冲击释放1.27s")],
-]);
-
 const COMPOSITE_RELEASE_SKILLS = new Map([
+  [FENGHUANG_SKILL.FIRE_CONE, [20613010201, 20613010202, 20613010204]],
+  [FENGHUANG_SKILL.ICE_CONE, [20618010201, 20618010202, 20618010204]],
   [FENGHUANG_SKILL.FIRE_DESCENT, [20613010501, 20613010502, 20613010503, 20613010504]],
 ]);
 
@@ -704,15 +697,6 @@ function detectDisplayMaxLevel(displaySkillId, concreteIds, slotKind, ctx) {
 }
 
 function resolveRideReleaseTime(displaySkillId, ride, displayCfg, skill, ctx, warnings) {
-  const guide = GUIDE_RELEASE_FRAMES.get(displaySkillId);
-  if (guide) {
-    return {
-      releaseFrames: guide.frames,
-      releaseSeconds: guide.frames / BATTLE_FRAMES_PER_SECOND,
-      releaseTimeSource: guide.source,
-    };
-  }
-
   const composite = COMPOSITE_RELEASE_SKILLS.get(displaySkillId);
   if (composite) {
     let frames = 0;
@@ -724,13 +708,14 @@ function resolveRideReleaseTime(displaySkillId, ride, displayCfg, skill, ctx, wa
         continue;
       }
       const cfg = resolveRideCfgFile(s, ride, ctx, warnings);
-      const t = cfg.entityCfg?.time?.[s.entityAction];
+      const rel = eng.resolveReleaseTime(cfg.entityCfg, s.entityAction, cfg.hasActionCfg, warnings, s);
+      const t = rel.releaseFrames;
       if (typeof t !== "number") {
         warnings.push({ code: eng.WARN.SOURCE_DEFAULT_30_FRAMES, detail: `composite release skill ${skillId} action=${s.entityAction} 缺少 time` });
         continue;
       }
       frames += t;
-      actions.push(s.entityAction);
+      actions.push(`${s.entityAction}[${rel.releaseTimeSource}]`);
     }
     return {
       releaseFrames: frames || null,
@@ -739,7 +724,7 @@ function resolveRideReleaseTime(displaySkillId, ride, displayCfg, skill, ctx, wa
     };
   }
 
-  return eng.resolveReleaseTime(displayCfg.entityCfg, skill.entityAction, displayCfg.hasActionCfg, warnings);
+  return eng.resolveReleaseTime(displayCfg.entityCfg, skill.entityAction, displayCfg.hasActionCfg, warnings, skill);
 }
 
 function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {

@@ -266,7 +266,7 @@ export default function SkillCard({ card, levels, slotLabel, badge }: Props) {
       {officialDescription && (
         <div className="border-t border-border px-5 py-3">
           <div className="rounded-lg bg-surface px-3 py-2">
-            <div className="mb-1 text-[11px] text-textSub">官方描述</div>
+            <div className="mb-1 text-[11px] text-textSub">技能介绍</div>
             <div className="h-20 overflow-y-auto whitespace-pre-wrap break-words pr-1 text-xs leading-relaxed text-textMain">
               {officialDescription}
             </div>

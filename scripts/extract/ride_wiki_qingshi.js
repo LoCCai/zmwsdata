@@ -7,7 +7,7 @@
  * 在导出阶段按攻略和表数据成文输出，前端只负责渲染。
  */
 const u = require("../lib/utils");
-const eng = require("./lib/skill-engine");
+const eng = require("./lib/ride-skill-engine");
 const ov = require("./lib/overrides");
 const metrics = require("./lib/metrics");
 
@@ -438,7 +438,7 @@ function buildSkillCard(displaySkillId, ride, slotLabel, slotKind, ctx) {
   const maxLevel = slotKind === "passive" ? 1 : eng.detectMaxLevel(skill, ctx.skillLevelById);
   const rel = slotKind === "passive"
     ? { releaseFrames: null, releaseSeconds: null, releaseTimeSource: "effectOnly" }
-    : eng.resolveReleaseTime(cfg.entityCfg, skill.entityAction, cfg.hasActionCfg, warnings);
+    : eng.resolveReleaseTime(cfg.entityCfg, skill.entityAction, cfg.hasActionCfg, warnings, skill);
 
   const { fixedBuffs, growthBuffRefs } = collectBuffs(displaySkillId, concreteIds, ride, slotKind, ctx, warnings);
   const levels = [];

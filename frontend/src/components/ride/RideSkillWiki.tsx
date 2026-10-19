@@ -22,7 +22,13 @@ interface RideWikiVariant {
 }
 
 interface RideWikiPayload {
-  rideGroup: { key: string; name: string; note?: string };
+  rideGroup: {
+    key: string;
+    name: string;
+    note?: string;
+    introduction?: string;
+    improvements?: Array<{ label: string; value: string }>;
+  };
   variants: RideWikiVariant[];
   skillBaselines?: RideSkillBaselineEntry[];
 }
@@ -254,11 +260,31 @@ export default function RideSkillWiki({ dataSources }: Props) {
           <h3 className="text-xl font-medium text-textSub">正在加载坐骑技能 Wiki...</h3>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {cards.map((c, i) => (
-            <SkillCardView key={`${activeVariant.ride.id}-${c.card.skillId}-${i}`} card={c.card} level={displayLevel} levels={selectedLevels} slotLabel={c.slotLabel} badge={c.badge} />
-          ))}
-        </div>
+        <>
+          {payload?.rideGroup.introduction && (
+            <section aria-label={`${activeVariant.ride.name}介绍`} className="space-y-4 rounded-[24px] border border-border bg-card p-5">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-textMain">{activeVariant.ride.name}</h3>
+                <p className="text-sm leading-relaxed text-textSub">{payload.rideGroup.introduction}</p>
+              </div>
+              {Boolean(payload.rideGroup.improvements?.length) && (
+                <dl className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {payload.rideGroup.improvements?.map((item) => (
+                    <div key={item.label} className="space-y-1.5 rounded-xl bg-surface p-3">
+                      <dt className="text-sm font-medium text-textMain">{item.label}</dt>
+                      <dd className="text-sm leading-relaxed text-textSub">{item.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </section>
+          )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {cards.map((c, i) => (
+              <SkillCardView key={`${activeVariant.ride.id}-${c.card.skillId}-${i}`} card={c.card} level={displayLevel} levels={selectedLevels} slotLabel={c.slotLabel} badge={c.badge} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
