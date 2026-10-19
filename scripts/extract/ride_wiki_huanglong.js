@@ -175,7 +175,6 @@ function extract() {
         add('释放时间', `起手 ${cfg.time.skill4_1} 帧、吐息 ${cfg.time.skill4_3} 帧，未蓄力共 ${frames} 帧（约 ${Number(seconds.toFixed(3))} 秒），攻转 ${round(basePer / seconds)}。满蓄共 ${frames + maxFrames} 帧（约 ${Number(fullSeconds.toFixed(3))} 秒），攻转约 ${round(fullPer / fullSeconds)}。`);
         add('范围与出手提升', '相比神天应龙，吐息提前 5 帧（约 0.167 秒）出现。每档蓄力的雷柱大小加成为 8%，由原来的 2% 提高至四倍；六档蓄满时，这项大小加成由 12% 提高至 48%。吐息还能推退霸体敌人。');
         add('姿态与体力', '起手切换飞行，蓄力时可以低速移动，蓄满前体力消耗与地面一致。');
-        add('高等级固定伤害', '技能 1～49 级的固定伤害与神天应龙相同；50 级起固定伤害成长更高，60 级共 5188594，比神天应龙的 4150872 高约 25%。');
         add('水络电涌', electricText(damageId));
       } else if (skillId === 20635030501) {
         bulletId = 7571;

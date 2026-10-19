@@ -15,9 +15,12 @@ const CONCURRENCY = 8;
 const ROGUE_ITEM_FILENAME_RE = /^rogueItem\./;
 const ROGUE_ITEM_OFFICIAL_DESCRIPTION_COLUMN_INDEX = 4;
 const RUNTIME_EMBEDDED_TABLES = ['breathing', 'breathingAcupoint'];
+const CACHE_BUSTER = `cb=${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 async function fetchText(url, isEntry = false) {
-  const finalUrl = isEntry ? (url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`) : url;
+  const target = new URL(url);
+  target.searchParams.set('cb', CACHE_BUSTER);
+  const finalUrl = target.toString();
   let lastError;
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
