@@ -199,7 +199,12 @@ function buildRideWiki(writer, replacedSources) {
       const fileName = writer.write(
         `ride/wiki/${uniqueSegment(ride.name, used, `坐骑-${ride.id || entries.length + 1}`)}`,
         {
-          rideGroup: { key: source.data.rideGroup?.key, name: ride.name },
+          rideGroup: {
+            key: source.data.rideGroup?.key,
+            name: ride.name,
+            ...(source.data.rideGroup?.introduction ? { introduction: source.data.rideGroup.introduction } : {}),
+            ...(source.data.rideGroup?.improvements ? { improvements: source.data.rideGroup.improvements } : {}),
+          },
           variants: [variant],
           skillBaselines: (baseline?.skills || [])
             .filter((skill) => Number(skill.rideId) === Number(ride.id))
