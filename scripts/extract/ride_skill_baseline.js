@@ -89,23 +89,31 @@ function buildRideWikiIndex(warnings) {
       continue;
     }
 
+    const entries = pickHighestRideVariants(variants).map((variant) => {
+      const ride = variant.ride || {};
+      return {
+        fileName,
+        rideId: ride.id,
+        rideName: ride.name || `坐骑 ${ride.id}`,
+        idGroup: ride.idGroup ?? null,
+        rank: ride.rank ?? null,
+      };
+    }).filter((entry) => Number.isInteger(entry.rideId))
+      .sort((left, right) => left.rideId - right.rideId);
+
     groups.push({
       fileName,
       key: group.key || fileName.replace(/^ride_wiki_/, ""),
       name: group.name || fileName,
       note: group.note || null,
-      entries: pickHighestRideVariants(variants).map((variant) => {
-        const ride = variant.ride || {};
-        return {
-          fileName,
-          rideId: ride.id,
-          rideName: ride.name || `坐骑 ${ride.id}`,
-          idGroup: ride.idGroup ?? null,
-          rank: ride.rank ?? null,
-        };
-      }).filter((entry) => Number.isInteger(entry.rideId)),
+      entries,
     });
   }
+  groups.sort((left, right) => {
+    const leftId = left.entries[0]?.rideId ?? Number.MAX_SAFE_INTEGER;
+    const rightId = right.entries[0]?.rideId ?? Number.MAX_SAFE_INTEGER;
+    return leftId - rightId || left.fileName.localeCompare(right.fileName);
+  });
   return {
     groups,
     warnings,

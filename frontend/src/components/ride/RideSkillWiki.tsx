@@ -105,7 +105,7 @@ export default function RideSkillWiki({ dataSources }: Props) {
         });
       }
     }
-    return entries;
+    return entries.sort((left, right) => left.rideId - right.rideId || left.groupKey.localeCompare(right.groupKey));
   }, [indexGroups]);
   const [activeGroupKey, setActiveGroupKey] = useState(firstGroupKey);
   const [activeRideId, setActiveRideId] = useState<number | null>(null);
